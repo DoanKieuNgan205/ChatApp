@@ -1,0 +1,87 @@
+/*{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build & Run ChatApp",
+            "type": "shell",
+            "command": "${workspaceFolder}\\start_all.bat",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}*/
+
+
+/*{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Server",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "Server/Src/*.cpp",
+                "-o",
+                "server.exe",
+                "-lws2_32",
+                "-pthread"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Client",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "Client/Src/*.cpp",
+                "-o",
+                "client.exe",
+                "-lws2_32",
+                "-pthread"
+            ],
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}*/
+
+
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build All",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "Server/Src/*.cpp",
+                "-IServer/Include",
+                "-o",
+                "server.exe",
+                "-lws2_32",
+                "-pthread",
+                "&&",
+                "g++",
+                "Client/Src/*.cpp",
+                "-IClient/Include",
+                "-o",
+                "client.exe",
+                "-lws2_32",
+                "-pthread"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
+
+
