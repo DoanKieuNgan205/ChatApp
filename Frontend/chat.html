@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChatApp</title>
+  <link rel="stylesheet" href="chat.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="profile">
+        <div class="avatar">👤</div>
+        <div class="meta">
+          <div id="me-username">User</div>
+          <small id="me-status">Online</small>
+        </div>
+      </div>
+
+      <div class="search">
+        <input type="text" id="searchUser" placeholder="Tìm kiếm người dùng..." />
+      </div>
+
+      <div class="user-list" id="userList">
+        <!-- danh sách người dùng online -->
+      </div>
+    </aside>
+
+    <main class="chat-panel">
+      <header class="chat-header">
+        <div id="chatWith">Chọn người để chat</div>
+        <div id="chatActions"></div>
+      </header>
+
+      <section class="messages" id="messages">
+        <!-- messages sẽ xuất ở đây -->
+      </section>
+
+      <footer class="composer">
+        <!-- input file ẩn -->
+        <input type="file" id="fileInput" hidden />
+
+        <!-- nút chọn file -->
+        <button type="button" id="fileBtn">📎</button>
+        <button type="button" id="voiceBtn">🎙</button>
+        <input type="text" id="msgInput" placeholder="Gõ tin nhắn..." />
+        <button id="sendBtn">Gửi</button>
+      </footer>
+    </main>
+  </div>
+
+<script src="chat.js"></script>
+</body>
+</html>

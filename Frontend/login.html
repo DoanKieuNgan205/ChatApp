@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Đăng nhập ChatApp</title>
+  <link rel="stylesheet" href="chat.css" />
+</head>
+<body>
+  <div class="login-container">
+    <h2>Đăng nhập ChatApp</h2>
+    <form id="loginForm">
+      <input type="text" id="username" placeholder="Tên đăng nhập" required />
+      <input type="password" id="password" placeholder="Mật khẩu" required />
+      <button type="submit">Đăng nhập</button>
+    </form>
+    <p id="status"></p>
+  </div>
+
+<script>
+(() => {
+  const statusEl = document.getElementById('status');
+  // Kết nối WebSocket tới Gateway
+  const ws = new WebSocket('ws://localhost:3000');
+
+  ws.addEventListener('open', () => {
+    console.log('[Frontend] WS connected to gateway');
+  });
+
+  ws.addEventListener('message', (ev) => {
+    // Server/Gateway trả về JSON
+    try {
+      const data = JSON.parse(ev.data);
+      console.log('[Frontend] Received', data);
+
+      // Nếu phản hồi login
+      if (data.action === 'login_response' || (data.status && data.message)) {
+        // server C++ trả JSON: { status: "success", message: "LOGIN_SUCCESS" }
+        if (data.status === 'success' && data.message === 'LOGIN_SUCCESS') {
+          statusEl.style.color = 'green';
+          statusEl.textContent = 'Đăng nhập thành công. Chuyển tới chat...';
+          // Lưu username vào sessionStorage và chuyển trang
+          // username đã được lưu lúc gửi (see below)
+          setTimeout(() => {
+            window.location.href = 'chat.html';
+          }, 400);
+        } else {
+          statusEl.style.color = 'red';
+          statusEl.textContent = 'Sai tài khoản hoặc mật khẩu.';
+        }
+      }
+    } catch (e) {
+      console.warn('[Frontend] Non-json message', ev.data);
+    }
+  });
+
+  ws.addEventListener('error', (e) => {
+    statusEl.style.color = 'red';
+    statusEl.textContent = 'Không kết nối được gateway (ws://localhost:3000)';
+    console.error(e);
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', (evt) => {
+    evt.preventDefault();
+    const u = document.getElementById('username').value.trim();
+    const p = document.getElementById('password').value.trim();
+    if (!u || !p) {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Vui lòng nhập đầy đủ thông tin';
+      return;
+    }
+
+    // Lưu tạm username để chat.html dùng
+    sessionStorage.setItem('chat_username', u);
+
+    // Gửi login request tới gateway (gateway sẽ chuyển tiếp tới C++ server)
+    const payload = { action: 'login', username: u, password: p };
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload));
+      statusEl.style.color = 'black';
+      statusEl.textContent = 'Đang xác thực...';
+      console.log('[Frontend] Sent login', payload);
+    } else {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Chưa kết nối tới gateway, thử lại sau';
+    }
+  });
+})();
+</script>
+</body>
+</html>

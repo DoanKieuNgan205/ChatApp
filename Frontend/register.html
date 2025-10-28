@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Đăng ký ChatApp</title>
+  <link rel="stylesheet" href="chat.css" />
+</head>
+<body>
+  <div class="login-container">
+    <h2>Đăng ký ChatApp</h2>
+    <form id="registerForm">
+      <input type="text" id="username" placeholder="Tên đăng nhập" required />
+      <input type="password" id="password" placeholder="Mật khẩu" required />
+      <input type="password" id="confirm" placeholder="Nhập lại mật khẩu" required />
+      <button type="submit">Đăng ký</button>
+    </form>
+
+    <p id="status"></p>
+    <p style="text-align:center;margin-top:10px;">
+      Đã có tài khoản? <a href="login.html" style="color:#6f5ce8;text-decoration:none;">Đăng nhập ngay</a>
+    </p>
+  </div>
+
+<script>
+(() => {
+  const statusEl = document.getElementById('status');
+  const ws = new WebSocket('ws://localhost:3000'); // Kết nối tới Gateway WebSocket
+
+  ws.addEventListener('open', () => {
+    console.log('[Frontend] Connected to gateway');
+  });
+
+  ws.addEventListener('message', (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      console.log('[Frontend] Received', data);
+
+      // ✅ Server trả về phản hồi đăng ký
+      if (data.action === 'register_response' || data.status) {
+        if (data.status === 'success') {
+          statusEl.style.color = 'green';
+          statusEl.textContent = 'Đăng ký thành công! Chuyển sang đăng nhập...';
+          setTimeout(() => {
+            window.location.href = 'login.html';
+          }, 1000);
+        } else {
+          statusEl.style.color = 'red';
+          statusEl.textContent = data.message || 'Đăng ký thất bại. Username có thể đã tồn tại.';
+        }
+      }
+    } catch (e) {
+      console.warn('[Frontend] Non-JSON message', ev.data);
+    }
+  });
+
+  ws.addEventListener('error', () => {
+    statusEl.style.color = 'red';
+    statusEl.textContent = 'Không kết nối được gateway (ws://localhost:3000)';
+  });
+
+  document.getElementById('registerForm').addEventListener('submit', (evt) => {
+    evt.preventDefault();
+    const u = document.getElementById('username').value.trim();
+    const p = document.getElementById('password').value.trim();
+    const c = document.getElementById('confirm').value.trim();
+
+    if (!u || !p || !c) {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Vui lòng nhập đầy đủ thông tin';
+      return;
+    }
+    if (p !== c) {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Mật khẩu không khớp';
+      return;
+    }
+
+    const payload = { action: 'register', username: u, password: p };
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload));
+      statusEl.style.color = 'black';
+      statusEl.textContent = 'Đang xử lý đăng ký...';
+      console.log('[Frontend] Sent register', payload);
+    } else {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Chưa kết nối tới gateway, thử lại sau';
+    }
+  });
+})();
+</script>
+</body>
+</html>

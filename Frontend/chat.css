@@ -1,0 +1,244 @@
+/* chat.css - giao diện cơ bản tương tự mẫu */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+  height: 100vh;
+  background: linear-gradient(135deg,#f0f4ff,#f7fff5);
+}
+
+/* layout */
+.app {
+  display: flex;
+  height: 100vh;
+  gap: 20px;
+  padding: 24px;
+  align-items: stretch;
+}
+
+/* sidebar */
+.sidebar {
+  width: 320px;
+  background: linear-gradient(180deg,#6f5ce8,#9d7bff);
+  color: #fff;
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 6px 30px rgba(100,80,200,0.15);
+}
+
+.profile {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.avatar {
+  width: 56px; height:56px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size: 26px;
+}
+.meta { line-height: 1; }
+.meta #me-username { font-weight: 700; font-size: 16px; }
+.meta #me-status { opacity: 0.9; font-size: 12px; }
+
+.search input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  font-size: 14px;
+}
+
+/* list */
+.user-list {
+  overflow-y: auto;
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.user-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.user-item:hover { background: rgba(255,255,255,0.08); }
+.user-item .dot { width:12px;height:12px;border-radius:50%; background:#2dd36f; }
+.user-item .name { font-weight:600; }
+.user-item small { opacity:0.9; font-size:12px; }
+
+/* chat panel */
+.chat-panel {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  background: #fff;
+  border-radius:16px;
+  box-shadow: 0 6px 30px rgba(20,20,40,0.06);
+  overflow: hidden;
+}
+
+.chat-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:18px;
+  border-bottom: 1px solid #f0f0f5;
+}
+.chat-header #chatWith { font-weight: 700; font-size: 18px; }
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  overflow-y: auto;
+  height: 400px;
+  background: #f5f6f8;
+}
+
+/* Tin nhắn chung */
+.message {
+  display: flex;
+  align-items: flex-end;
+  margin: 8px 0;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Hiệu ứng trượt nhẹ khi xuất hiện */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Bong bóng tin nhắn */
+.bubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  word-wrap: break-word;
+  font-size: 15px;
+  line-height: 1.4;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Tin người khác (trái) */
+.message.left {
+  justify-content: flex-start;
+}
+
+.message.left .bubble {
+  background-color: #e4e6eb;
+  color: #000;
+  border-top-left-radius: 0;
+}
+
+/* Tin của tôi (phải) */
+.message.right {
+  justify-content: flex-end;
+}
+
+.message.right .bubble {
+  background-color: #0084ff;
+  color: white;
+  border-top-right-radius: 0;
+}
+
+/* Avatar nhỏ */
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+
+
+/* composer */
+.composer {
+  display:flex;
+  gap: 8px;
+  padding: 14px;
+  border-top: 1px solid #f0f0f5;
+}
+.composer input {
+  flex:1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e6e6f0;
+  outline:none;
+}
+.composer button {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: #6f5ce8;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* responsive */
+@media (max-width: 900px) {
+  .app { padding: 12px; gap: 8px; }
+  .sidebar { display:none; }
+}
+
+
+.message {
+  display: flex;
+  margin: 6px 0;
+  align-items: flex-end;
+}
+.message.left { justify-content: flex-start; }
+.message.right { justify-content: flex-end; }
+
+.bubble {
+  padding: 8px 12px;
+  border-radius: 15px;
+  max-width: 60%;
+  background: #f0f0f0;
+  word-wrap: break-word;
+}
+.message.right .bubble {
+  background: #d2f8d2;
+}
+.avatar {
+  width: 32px;
+  height: 32px;
+  background: #0078ff;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 6px;
+  font-weight: bold;
+}
+.user-item {
+  cursor: pointer;
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+  transition: 0.2s;
+}
+.user-item:hover {
+  background: #e6f7ff;
+}

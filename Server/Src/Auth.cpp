@@ -1,52 +1,113 @@
 #include "Auth.h"
+#include <iostream>
+#include "DatabaseHelper.h"
 
+// DatabaseHelper khai báo global trong main.cpp
+extern DatabaseHelper db;
 
-static string trim(const string &s) {
-    string result = s;
-    result.erase(result.begin(), find_if(result.begin(), result.end(),
-        [](unsigned char ch){ return !isspace(ch); }));
-    result.erase(find_if(result.rbegin(), result.rend(),
-        [](unsigned char ch){ return !isspace(ch); }).base(), result.end());
-    return result;
-}
-
-bool Auth::checkCredentials(const string& request) {
-    // parse JSON thủ công
-    auto extractValue = [&](const string& key) {
+bool Auth::checkCredentials(const std::string& request) {
+    // Hàm parse JSON thủ công
+    auto extractValue = [&](const std::string& key) {
         size_t pos = request.find(key);
-        if (pos == string::npos) return string("");
+        if (pos == std::string::npos) return std::string("");
         pos = request.find(":", pos);
-        if (pos == string::npos) return string("");
+        if (pos == std::string::npos) return std::string("");
         size_t start = request.find("\"", pos);
         size_t end   = request.find("\"", start+1);
-        if (start == string::npos || end == string::npos) return string("");
+        if (start == std::string::npos || end == std::string::npos) return std::string("");
         return request.substr(start+1, end-start-1);
     };
 
-    string username = extractValue("\"username\"");
-    string password = extractValue("\"password\"");
+    std::string username = extractValue("\"username\"");
+    std::string password = extractValue("\"password\"");
 
-    cout << "[DEBUG] Username: " << username << ", Password: " << password << endl;
+    std::cout << "[DEBUG] Username: " << username 
+              << ", Password: " << password << std::endl;
 
-    // đọc file users.txt
-    ifstream file("users.txt");
-    if (!file.is_open()) {
-        cerr << "Không mở được file users.txt\n";
+    // Dùng DatabaseHelper để kiểm tra
+    if (!db.isConnected()) {
+        std::cerr << "[ERROR] Database chưa kết nối!\n";
         return false;
     }
 
-    string user, pass;
-    while (file >> user >> pass) {
-        // xử lý \r nếu có
-        if (!pass.empty() && pass.back() == '\r') {
-            pass.pop_back();
-        }
-        if (user == username && pass == password) {
-            return true;
-        }
-    }
-    return false;
+    //return db.checkLogin(username, password);
+    bool ok = db.checkLogin(username, password);
+    std::cout << "[DEBUG][Auth] checkLogin result = " << (ok ? "true" : "false") << std::endl;
+    return ok;
 }
+
+/*#include "Auth.h"
+#include "DatabaseHelper.h"
+#include <iostream>
+
+// DatabaseHelper được khai báo global trong main.cpp
+extern DatabaseHelper db;
+
+// 🧩 Hàm tách giá trị JSON thủ công (đơn giản, không cần thư viện)
+static std::string extractValue(const std::string& json, const std::string& key) {
+    size_t pos = json.find(key);
+    if (pos == std::string::npos) return "";
+    pos = json.find(":", pos);
+    if (pos == std::string::npos) return "";
+    size_t start = json.find("\"", pos);
+    size_t end   = json.find("\"", start + 1);
+    if (start == std::string::npos || end == std::string::npos) return "";
+    return json.substr(start + 1, end - start - 1);
+}
+
+// ===========================
+// 🔹 Kiểm tra đăng nhập
+// ===========================
+bool Auth::checkCredentials(const std::string& request) {
+    std::string username = extractValue(request, "\"username\"");
+    std::string password = extractValue(request, "\"password\"");
+
+    std::cout << "[Auth] Kiểm tra login: user=" << username 
+              << " pass=" << password << std::endl;
+
+    if (!db.isConnected()) {
+        std::cerr << "[Auth] ❌ Database chưa kết nối!\n";
+        return false;
+    }
+
+    bool ok = db.checkLogin(username, password);
+    std::cout << "[Auth] Kết quả checkLogin = " << (ok ? "✅" : "❌") << std::endl;
+    return ok;
+}
+
+// ===========================
+// 🔹 Đăng ký tài khoản mới
+// ===========================
+bool Auth::registerAccount(const std::string& request) {
+    std::string username = extractValue(request, "\"username\"");
+    std::string password = extractValue(request, "\"password\"");
+
+    std::cout << "[Auth] Đăng ký tài khoản: user=" << username 
+              << " pass=" << password << std::endl;
+
+    if (!db.isConnected()) {
+        std::cerr << "[Auth] ❌ Database chưa kết nối!\n";
+        return false;
+    }
+
+    // Kiểm tra tài khoản tồn tại chưa
+    if (db.checkUserExists(username)) {
+        std::cerr << "[Auth] ⚠️ Tài khoản đã tồn tại!\n";
+        return false;
+    }
+
+    // Thêm tài khoản mới
+    bool ok = db.addUser(username, password);
+    std::cout << "[Auth] Kết quả đăng ký = " << (ok ? "✅" : "❌") << std::endl;
+    return ok;
+}*/
+
+
+
+
+
+
+
 
 
 

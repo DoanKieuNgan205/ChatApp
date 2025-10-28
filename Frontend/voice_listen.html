@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Đang nói chuyện</title>
+  <link rel="stylesheet" href="voice.css" />
+</head>
+<body>
+  <div class="voice-container">
+    <h2>🗣 Đang nói chuyện với <span id="partnerName"></span></h2>
+    <div class="avatar">🎧</div>
+    <button id="endBtn">🔴 Kết thúc cuộc gọi</button>
+  </div>
+
+  <script type="module">
+    import { connectToVoiceServer } from './voice.js';
+
+    const params = new URLSearchParams(window.location.search);
+    const me = params.get('me');
+    const partner = params.get('to');
+    document.getElementById('partnerName').innerText = partner;
+
+    // Kết nối tới VoiceServer (qua Node.js)
+    connectToVoiceServer(me);
+
+    document.getElementById('endBtn').onclick = () => {
+      alert("Cuộc gọi đã kết thúc.");
+      window.location.href = "chat.html";
+    };
+  </script>
+</body>
+</html>
