@@ -1,16 +1,14 @@
-// voice_gateway.js - Node.js trung gian giữa Web UI và C++ VoiceServer
-
 import dgram from "dgram";
 import WebSocket, { WebSocketServer } from "ws";
 
-const UDP_SERVER_PORT = 6060;  // Cổng UDP VoiceServer.cpp
-const WS_PORT = 8080;          // Cổng WebSocket cho frontend
+const UDP_SERVER_PORT = 6060;  
+const WS_PORT = 8080;          
 
 const udpClient = dgram.createSocket("udp4");
 const wss = new WebSocketServer({ port: WS_PORT });
 
-let users = {}; // username -> ws
-let activeCalls = {}; // from -> to
+let users = {}; 
+let activeCalls = {}; 
 
 
 wss.on("connection", (ws) => {
@@ -37,7 +35,7 @@ function handleWebMessage(ws, data) {
             break;
 
         case "CALL":
-            activeCalls[data.from] = data.to; // lưu cặp cuộc gọi
+            activeCalls[data.from] = data.to; 
             sendUDP(`CALL:${data.from}|TO:${data.to}`);
             break;
 
@@ -50,7 +48,6 @@ function handleWebMessage(ws, data) {
             break;
 
         case "AUDIO_DATA":
-            // Gói dữ liệu nhị phân gửi sang C++ server
             const header = Buffer.from(`FROM:${data.from}|TO:${data.to}|`);
             const audioBuf = Buffer.from(Uint8Array.from(data.data));
             const packet = Buffer.concat([header, audioBuf]);
@@ -59,37 +56,13 @@ function handleWebMessage(ws, data) {
     }
 }
 
-// === Nhận dữ liệu từ C++ VoiceServer ===
-/*udpClient.on("message", (msg) => {
-    const text = msg.toString();
-
-    if (text.startsWith("INCOMING_CALL:")) {
-        const caller = text.split(":")[1];
-        broadcast({ type: "INCOMING_CALL", from: caller });
-    } else if (text.startsWith("CALL_ACCEPTED:")) {
-        const user = text.split(":")[1];
-        broadcast({ type: "CALL_ACCEPTED", from: user });
-    } else if (text.startsWith("CALL_REJECTED:")) {
-        const user = text.split(":")[1];
-        broadcast({ type: "CALL_REJECTED", from: user });
-    } else if (text.startsWith("FROM:")) {
-        // FROM:<name>|DATA|<binary>
-        const headerEnd = text.indexOf("|DATA|");
-        const fromUser = text.substring(5, headerEnd);
-        const headerLen = headerEnd + 6;
-        const audioData = msg.slice(headerLen);
-        broadcast({ type: "AUDIO_DATA", from: fromUser, data: Array.from(audioData) });
-    }
-});*/
-
-
 udpClient.on("message", (msg) => {
     const text = msg.toString();
 
     if (text.startsWith("INCOMING_CALL:")) {
-        // INCOMING_CALL:<caller>|TO:<target>
+        
         const caller = text.split(":")[1];
-        const target = activeCalls[caller]; // người bị gọi
+        const target = activeCalls[caller]; 
         if (target && users[target] && users[target].readyState === WebSocket.OPEN) {
             users[target].send(JSON.stringify({ type: "INCOMING_CALL", from: caller }));
             console.log(`📞 Cuộc gọi từ ${caller} tới ${target}`);
@@ -97,7 +70,7 @@ udpClient.on("message", (msg) => {
     }
 
     else if (text.startsWith("CALL_ACCEPTED:")) {
-        // CALL_ACCEPTED:<user>|TO:<caller>
+        
         const [fromPart, toPart] = text.split("|");
         const fromUser = fromPart.split(":")[1];
         const toUser = toPart.split(":")[1];
@@ -106,7 +79,7 @@ udpClient.on("message", (msg) => {
     }
 
     else if (text.startsWith("CALL_REJECTED:")) {
-        // CALL_REJECTED:<user>|TO:<caller>
+        
         const [fromPart, toPart] = text.split("|");
         const fromUser = fromPart.split(":")[1];
         const toUser = toPart.split(":")[1];
@@ -120,11 +93,11 @@ udpClient.on("message", (msg) => {
         const headerLen = headerEnd + 6;
         const audioData = msg.slice(headerLen);
         const jsonMsg = { type: "AUDIO_DATA", from: fromUser, data: Array.from(audioData) };
-        broadcast(jsonMsg); // vẫn broadcast để cả hai bên nghe được
+        broadcast(jsonMsg); 
     }
 });
 
-// Gửi riêng cho 1 user
+
 function sendToUser(username, message) {
     const ws = users[username];
     if (ws && ws.readyState === WebSocket.OPEN) {

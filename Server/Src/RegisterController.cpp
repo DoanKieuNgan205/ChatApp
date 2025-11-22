@@ -2,11 +2,10 @@
 #include "DatabaseHelper.h"
 #include <iostream>
 
-// DatabaseHelper được khai báo global ở main.cpp
 extern DatabaseHelper db;
 
 std::string RegisterController::handleRegister(const std::string& request) {
-    // Parse JSON đơn giản
+    
     auto extractValue = [&](const std::string& key) {
         size_t pos = request.find(key);
         if (pos == std::string::npos) return std::string("");
@@ -36,11 +35,5 @@ std::string RegisterController::handleRegister(const std::string& request) {
     }
 }
 
-/*#include "RegisterController.h"
-#include <iostream>
 
-std::string RegisterController::handleRegister(const std::string& json) {
-    std::cout << "[RegisterController] Received register request: " << json << "\n";
-    return R"({"action":"register_ok","status":"success"})";
-}*/
 

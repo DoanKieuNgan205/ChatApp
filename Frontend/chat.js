@@ -13,71 +13,45 @@ const sendBtn = document.getElementById("sendBtn");
 const chatWith = document.getElementById("chatWith");
 const meUsername = document.getElementById("me-username");
 
-
-// ✅ thêm phần gửi file
 const fileBtn = document.getElementById("fileBtn");
 const fileInput = document.getElementById("fileInput");
 
 let currentChatUser = null;
 let typingTimeout;
-// Bộ nhớ tạm tin nhắn
 let messageHistory = {};
 
-// Khi WebSocket mở kết nối
+const incomingCallModal = document.getElementById("incomingCallModal");
+const callerNameSpan = document.getElementById("callerName");
+const acceptCallBtn = document.getElementById("acceptCallBtn");
+const rejectCallBtn = document.getElementById("rejectCallBtn");
+
+let incomingCallFrom = null; 
+
 ws.addEventListener("open", () => {
   console.log("✅ Connected to gateway");
   meUsername.innerText = username;
 
   ws.send(JSON.stringify({ action: "join_chat", username }));
 
-  // Lấy danh sách user online
   setTimeout(() => ws.send(JSON.stringify({ action: "list" })), 200);
+
+  ws.send(JSON.stringify({
+    action: "get_history",
+    username: username
+  }));
 });
 
-// Nếu bị mất kết nối
 ws.addEventListener("close", () => {
   alert("⚠️ Mất kết nối tới server. Vui lòng tải lại trang!");
 });
 
-// Nhận dữ liệu từ Gateway
+
 ws.addEventListener("message", (event) => {
   const data = JSON.parse(event.data);
   console.log("📩 Received:", data);
 
   switch (data.action) {
-    /*case "online_list":
-      renderUserList(data.users);
-      break;
-
-    case "private":
-      if (data.file) {
-        if (data.from === currentChatUser || data.from === "Tôi")
-          appendFileMessage(data.from, data.filename, data.file);
-        else showUserNotification(data.from, "📎 Gửi file mới");
-      } else if (data.from === currentChatUser) {
-        appendMessage(data.from, data.message);
-      } else {
-        showUserNotification(data.from, "💬 Gửi tin nhắn mới");
-      }
-      break;
-
-    case "broadcast":
-      appendMessage("Broadcast", data.message);
-      break;
-
-    case "history_response":
-      messages.innerHTML = "";
-      data.history.forEach((msg) => {
-        if (msg.file)
-          appendFileMessage(msg.from === username ? "Tôi" : msg.from, msg.filename, msg.file);
-        else appendMessage(msg.from === username ? "Tôi" : msg.from, msg.message);
-      });
-      break;
-
-    default:
-      console.log("⚠️ Unhandled action:", data);
-      break;
-  }*/
+    
     case "online_list":
       renderUserList(data.users);
       break;
@@ -113,29 +87,45 @@ ws.addEventListener("message", (event) => {
       break;
 
     case "history_response":
+    
       messages.innerHTML = "";
-      data.history.forEach((msg) => {
-        if (msg.file)
-          appendFileMessage(msg.from === username ? "Tôi" : msg.from, msg.filename, msg.file);
-        else appendMessage(msg.from === username ? "Tôi" : msg.from, msg.message);
+
+      if (!messageHistory[username]) messageHistory[username] = [];
+
+      (data.chatHistory || []).forEach(msg => {
+        const partner = msg.from === username ? msg.to : msg.from;
+        if (!messageHistory[partner]) messageHistory[partner] = [];
+        messageHistory[partner].push({ type: "text", from: msg.from, text: msg.message });
       });
+
+      (data.fileHistory || []).forEach(f => {
+        const partner = f.from === username ? f.to : f.from;
+        if (!messageHistory[partner]) messageHistory[partner] = [];
+        messageHistory[partner].push({ type: "file", from: f.from, filename: f.filename, url: `http://localhost:3001${f.path}` });
+      });
+
+      (data.callHistory || []).forEach(c => {
+        const partner = c.from === username ? c.to : c.from;
+        if (!messageHistory[partner]) messageHistory[partner] = [];
+        messageHistory[partner].push({ type: "call", from: c.from, status: c.status });
+      });
+
+      if (currentChatUser) renderHistory(currentChatUser);
       break;
 
-      // 🚀 THÊM CASE MỚI CHO VOICE
     case "INCOMING_CALL":
         console.log(`📞 Cuộc gọi đến từ ${data.from}`);
-        if (confirm(`${data.from} đang gọi bạn. Chấp nhận không?`)) {
-            // Nếu đồng ý, mở pop-up và truyền tín hiệu là "accept"
-            const url = `voice_call.html?me=${encodeURIComponent(username)}&to=${encodeURIComponent(data.from)}&action=accept`;
-            window.open(url, "voiceCall", "width=400,height=300");
-        } else {
-            // Nếu từ chối, gửi tin REJECT
-            ws.send(JSON.stringify({ 
-                action: "REJECT_CALL", 
-                from: data.from, // người gọi
-                to: username    // tôi là người bị gọi
-            }));
-        }
+        incomingCallFrom = data.from; 
+        callerNameSpan.innerText = incomingCallFrom; 
+        incomingCallModal.className = 'call-modal-visible'; 
+        if (!messageHistory[incomingCallFrom]) messageHistory[incomingCallFrom] = [];
+        messageHistory[incomingCallFrom].push({ type: "call", from: data.from, status: "incoming" });
+        break;
+
+    case "CALL_ENDED":
+        if (!messageHistory[data.from]) messageHistory[data.from] = [];
+        messageHistory[data.from].push({ type: "call", from: data.from, status: "ended" });
+        if (currentChatUser === data.from) renderHistory(currentChatUser);
         break;
 
     default:
@@ -144,7 +134,6 @@ ws.addEventListener("message", (event) => {
   }
 });
 
-// Gửi tin nhắn
 function sendMessage() {
   const msg = msgInput.value.trim();
   if (!msg) return;
@@ -164,7 +153,6 @@ function sendMessage() {
   msgInput.value = "";
 }
 
-// Sự kiện gửi
 sendBtn.onclick = sendMessage;
 msgInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
@@ -179,40 +167,6 @@ msgInput.addEventListener("keydown", (e) => {
   }
 });
 
-// File upload
-/*fileBtn.onclick = () => {
-  if (!currentChatUser) {
-    showHint("💡 Hãy chọn người để gửi file!");
-    return;
-  }
-  fileInput.click();
-};
-
-fileInput.onchange = () => {
-  const file = fileInput.files[0];
-  if (!file) return;
-
-  showHint(`⏳ Đang gửi ${file.name}...`);
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    const base64 = reader.result.split(",")[1];
-    ws.send(JSON.stringify({
-      action: "private",
-      from: username,
-      to: currentChatUser,
-      file: base64,
-      filename: file.name,
-    }));
-
-    appendFileMessage("Tôi", file.name, reader.result);
-    console.log(`[Client] ✅ Gửi file ${file.name} tới ${currentChatUser}`);
-    hideHint();
-    fileInput.value = "";
-  };
-  reader.readAsDataURL(file);
-};*/
-
 fileBtn.onclick = () => {
   if (!currentChatUser) return alert("Chọn người để gửi file!");
   fileInput.click();
@@ -226,7 +180,6 @@ fileInput.onchange = async () => {
   showHint(`⏳ Đang gửi ${file.name}...`);
 
   try {
-    // Upload file thật tới Gateway
     const formData = new FormData();
     formData.append("file", file);
     formData.append("from", username);
@@ -243,7 +196,6 @@ fileInput.onchange = async () => {
     if (result.success) {
       const fileUrl = "http://localhost:3001" + result.previewUrl;
 
-      // Gửi thông tin file qua WebSocket để hiển thị ở người nhận
       ws.send(
         JSON.stringify({
           action: "private",
@@ -267,7 +219,6 @@ fileInput.onchange = async () => {
   }
 };
 
-// Hiển thị danh sách người dùng
 function renderUserList(users) {
   userList.innerHTML = "";
   if (users.length === 1) {
@@ -280,42 +231,17 @@ function renderUserList(users) {
       const div = document.createElement("div");
       div.className = "user-item";
       div.textContent = u;
-
-      /*div.onclick = () => {
+      div.onclick = () => {                     
         currentChatUser = u;
         chatWith.textContent = "💬 Đang chat với: " + u;
-        messages.innerHTML = "";
-        ws.send(JSON.stringify({
-          action: "history_request",
-          username,
-          with: currentChatUser,
-        }));
-      };*/
-
-      div.onclick = () => {
-        currentChatUser = u;
-        chatWith.textContent = "💬 Đang chat với: " + u;
-        messages.innerHTML = "";
-
-        if (messageHistory[u]) {
-          for (const msg of messageHistory[u]) {
-            if (msg.type === "text") appendMessage(u, msg.text);
-            if (msg.type === "file") appendFileMessage(u, msg.filename, msg.url);
-          }
-        } else {
-          ws.send(JSON.stringify({
-            action: "history_request",
-            username,
-            with: currentChatUser,
-          }));
-        }
+        renderHistory(u); 
       };
       userList.appendChild(div);
     }
   });
 }
 
-// Tin nhắn text
+
 function appendMessage(from, msg) {
   const wrapper = document.createElement("div");
   wrapper.classList.add("message");
@@ -330,11 +256,9 @@ function appendMessage(from, msg) {
   if (from === "Tôi") {
     wrapper.classList.add("right");
     avatar.textContent = "🧑";
-    //bubble.innerHTML = `<b>${from}:</b> ${msg}`;
   } else {
     wrapper.classList.add("left");
     avatar.textContent = from[0].toUpperCase();
-    //bubble.innerHTML = `<b>${from}:</b> ${msg}`;
   }
 
   bubble.innerHTML = `<b>${from}:</b> ${msg}`;
@@ -342,43 +266,13 @@ function appendMessage(from, msg) {
   messages.appendChild(wrapper);
   wrapper.scrollIntoView({ behavior: "smooth" });
 
-  // Hiệu ứng nổi bật khi nhận tin nhắn
   bubble.animate([{ backgroundColor: "#e0f7ff" }, { backgroundColor: "transparent" }], {
     duration: 800,
   });
 }
 
-// Tin nhắn file
+
 function appendFileMessage(from, filename, fileUrl) {
-  /*const wrapper = document.createElement("div");
-  wrapper.classList.add("message");
-
-  const bubble = document.createElement("div");
-  bubble.classList.add("bubble");
-
-  const avatar = document.createElement("div");
-  avatar.classList.add("avatar");
-
-  const isImage = base64data.startsWith("data:image");
-
-  if (from === "Tôi") {
-    wrapper.classList.add("right");
-    avatar.textContent = "🧑";
-  } else {
-    wrapper.classList.add("left");
-    avatar.textContent = from[0].toUpperCase();
-  }
-
-  bubble.innerHTML = `<b>${from}:</b><br>${
-    isImage
-      ? `<img src="${base64data}" alt="${filename}" style="max-width:150px;border-radius:10px;margin-top:5px;">`
-      : `<a href="${base64data}" download="${filename}" style="color:#0078ff;">📎 ${filename}</a>`
-  }`;
-
-  wrapper.append(avatar, bubble);
-  messages.appendChild(wrapper);
-  wrapper.scrollIntoView({ behavior: "smooth" });*/
-
   const wrapper = document.createElement("div");
   wrapper.classList.add("message");
 
@@ -387,12 +281,6 @@ function appendFileMessage(from, filename, fileUrl) {
 
   const avatar = document.createElement("div");
   avatar.classList.add("avatar");
-
-  /*const isImage =
-    fileUrl.endsWith(".png") ||
-    fileUrl.endsWith(".jpg") ||
-    fileUrl.endsWith(".jpeg") ||
-    fileUrl.endsWith(".gif");*/
 
   const isImage = /\.(png|jpg|jpeg|gif)$/i.test(fileUrl);
 
@@ -404,13 +292,6 @@ function appendFileMessage(from, filename, fileUrl) {
     avatar.textContent = from[0].toUpperCase();
   }
 
-  /*bubble.innerHTML = `<b>${from}:</b><br>${
-    isImage
-      ? `<img src="http://localhost:3001${fileUrl}" alt="${filename}" style="max-width:150px;border-radius:10px;margin-top:5px;">`
-      : `<a href="http://localhost:3001${fileUrl}" download="${filename}" style="color:#0078ff;">📎 ${filename}</a>`
-  }`;*/
-
-  // ✅ hiển thị link tải đúng tên gốc
   bubble.innerHTML = `<b>${from}:</b><br>${
     isImage
       ? `<img src="${fileUrl}" alt="${filename}" style="max-width:150px;border-radius:10px;margin-top:5px;">`
@@ -422,7 +303,7 @@ function appendFileMessage(from, filename, fileUrl) {
   wrapper.scrollIntoView({ behavior: "smooth" });
 }
 
-// Gợi ý UX
+
 function showHint(text) {
   let hint = document.getElementById("hint-msg");
   if (!hint) {
@@ -449,18 +330,39 @@ function hideHint() {
   if (hint) hint.style.display = "none";
 }
 
-// Thông báo khi có tin nhắn mới
+
 function showUserNotification(user, message) {
   const existing = document.querySelector(`.user-item[data-user="${user}"]`);
   if (existing) existing.style.background = "#e6f7ff";
   showHint(`${user}: ${message}`);
 }
 
+function renderHistory(user) {
+  messages.innerHTML = "";
+  const history = messageHistory[user];
+  if (!history) return;
+
+  history.forEach(item => {
+    const fromDisplay = item.from === username ? "Tôi" : item.from;
+
+    if (item.type === "text") {
+      appendMessage(fromDisplay, item.text);
+    } else if (item.type === "file") {
+      appendFileMessage(fromDisplay, item.filename, item.url);
+    } else if (item.type === "call") {
+      const callText = `${fromDisplay} ${item.status === "accepted" ? "📞 gọi thành công" :
+                        item.status === "rejected" ? "❌ từ chối cuộc gọi" : "📲 bắt đầu cuộc gọi"}`;
+      appendMessage(fromDisplay, callText);
+    }
+  });
+}
 
 
-// --- Voice Call Integration ---
+
+
+
 document.getElementById("voiceBtn").addEventListener("click", () => {
-  // Giả sử bạn đã có biến currentUser và chatWith
+  
   const me = document.getElementById("me-username").innerText.trim();
   const to = currentChatUser;
   if (!to || to === "Chọn người để chat") {
@@ -468,11 +370,32 @@ document.getElementById("voiceBtn").addEventListener("click", () => {
     return;
   }
 
-  // Mở trang voice_call.html và truyền tham số
-  //const url = `voice_call.html?me=${encodeURIComponent(me)}&to=${encodeURIComponent(to)}`;
   const url = `voice_call.html?me=${encodeURIComponent(me)}&to=${encodeURIComponent(to)}&action=call`;
-  //window.location.href = url;
+  
   window.open(url, "voiceCall", "width=400,height=300,resizable=yes");
 });
 
 
+acceptCallBtn.addEventListener("click", () => {
+  if (!incomingCallFrom) return;
+
+  const url = `voice_call.html?me=${encodeURIComponent(username)}&to=${encodeURIComponent(incomingCallFrom)}&action=accept`;
+  window.open(url, "voiceCall", "width=400,height=300,resizable=yes");
+
+  incomingCallModal.className = 'call-modal-hidden';
+  incomingCallFrom = null;
+});
+
+
+rejectCallBtn.addEventListener("click", () => {
+  if (!incomingCallFrom) return;
+  
+  ws.send(JSON.stringify({ 
+      action: "REJECT_CALL", 
+      from: incomingCallFrom, 
+      to: username             
+  }));
+
+  incomingCallModal.className = 'call-modal-hidden';
+  incomingCallFrom = null;
+});

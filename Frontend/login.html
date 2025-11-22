@@ -20,70 +20,85 @@
 <script>
 (() => {
   const statusEl = document.getElementById('status');
-  // Kết nối WebSocket tới Gateway
-  const ws = new WebSocket('ws://localhost:3000');
+  const formEl = document.getElementById('loginForm');
 
-  ws.addEventListener('open', () => {
-    console.log('[Frontend] WS connected to gateway');
-  });
+  let ws = null;
 
-  ws.addEventListener('message', (ev) => {
-    // Server/Gateway trả về JSON
-    try {
-      const data = JSON.parse(ev.data);
-      console.log('[Frontend] Received', data);
+  function connectWS(callback) {
+    ws = new WebSocket('ws://localhost:3000');
 
-      // Nếu phản hồi login
-      if (data.action === 'login_response' || (data.status && data.message)) {
-        // server C++ trả JSON: { status: "success", message: "LOGIN_SUCCESS" }
-        if (data.status === 'success' && data.message === 'LOGIN_SUCCESS') {
-          statusEl.style.color = 'green';
-          statusEl.textContent = 'Đăng nhập thành công. Chuyển tới chat...';
-          // Lưu username vào sessionStorage và chuyển trang
-          // username đã được lưu lúc gửi (see below)
-          setTimeout(() => {
-            window.location.href = 'chat.html';
-          }, 400);
-        } else {
-          statusEl.style.color = 'red';
-          statusEl.textContent = 'Sai tài khoản hoặc mật khẩu.';
+    ws.addEventListener('open', () => {
+      console.log('[Frontend] ✅ WS connected to gateway');
+      if (callback) callback(); 
+    });
+
+    ws.addEventListener('message', (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        console.log('[Frontend] 📩 Received', data);
+
+        if (data.action === 'login_response' || (data.status && data.message)) {
+          if (data.status === 'success' && data.message === 'LOGIN_SUCCESS') {
+            statusEl.style.color = 'green';
+            statusEl.textContent = 'Đăng nhập thành công. Chuyển tới chat...';
+            setTimeout(() => (window.location.href = 'chat.html'), 400);
+          } else {
+            statusEl.style.color = 'red';
+            statusEl.textContent = 'Sai tài khoản hoặc mật khẩu.';
+          }
         }
+      } catch (e) {
+        console.warn('[Frontend] Non-JSON message:', ev.data);
       }
-    } catch (e) {
-      console.warn('[Frontend] Non-json message', ev.data);
-    }
-  });
+    });
 
-  ws.addEventListener('error', (e) => {
-    statusEl.style.color = 'red';
-    statusEl.textContent = 'Không kết nối được gateway (ws://localhost:3000)';
-    console.error(e);
-  });
+    ws.addEventListener('close', () => {
+      console.warn('[Frontend] ⚠️ WS connection closed');
+    });
 
-  document.getElementById('loginForm').addEventListener('submit', (evt) => {
+    ws.addEventListener('error', (e) => {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Không kết nối được gateway (ws://localhost:3000)';
+      console.error(e);
+    });
+  }
+
+  connectWS();
+
+  formEl.addEventListener('submit', (evt) => {
     evt.preventDefault();
+
     const u = document.getElementById('username').value.trim();
     const p = document.getElementById('password').value.trim();
+
     if (!u || !p) {
       statusEl.style.color = 'red';
       statusEl.textContent = 'Vui lòng nhập đầy đủ thông tin';
       return;
     }
 
-    // Lưu tạm username để chat.html dùng
     sessionStorage.setItem('chat_username', u);
 
-    // Gửi login request tới gateway (gateway sẽ chuyển tiếp tới C++ server)
     const payload = { action: 'login', username: u, password: p };
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(payload));
-      statusEl.style.color = 'black';
-      statusEl.textContent = 'Đang xác thực...';
-      console.log('[Frontend] Sent login', payload);
-    } else {
-      statusEl.style.color = 'red';
-      statusEl.textContent = 'Chưa kết nối tới gateway, thử lại sau';
+
+    if (ws.readyState !== WebSocket.OPEN) {
+      console.log('[Frontend] ⚡ WS not open, reconnecting...');
+      statusEl.style.color = 'gray';
+      statusEl.textContent = 'Đang kết nối lại...';
+
+      connectWS(() => {
+        console.log('[Frontend] 🔁 Reconnected, sending login');
+        ws.send(JSON.stringify(payload));
+        statusEl.style.color = 'black';
+        statusEl.textContent = 'Đang xác thực...';
+      });
+      return;
     }
+
+    ws.send(JSON.stringify(payload));
+    statusEl.style.color = 'black';
+    statusEl.textContent = 'Đang xác thực...';
+    console.log('[Frontend] Sent login', payload);
   });
 })();
 </script>

@@ -24,7 +24,7 @@ document.getElementById("loginForm").addEventListener("submit", (e) => {
       if (data.status === "success") {
         status.style.color = "green";
         status.textContent = "Đăng nhập thành công!";
-        // Có thể chuyển sang trang chat.html ở đây
+        
       } else {
         status.style.color = "red";
         status.textContent = "Sai tài khoản hoặc mật khẩu!";

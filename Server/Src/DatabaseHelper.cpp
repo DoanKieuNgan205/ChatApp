@@ -3,7 +3,6 @@
 using namespace std;
 
 DatabaseHelper::DatabaseHelper() : hEnv(NULL), hDbc(NULL), connected(false) {
-    // Cấp phát môi trường ODBC
     SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &hEnv);
     SQLSetEnvAttr(hEnv, SQL_ATTR_ODBC_VERSION, (void*)SQL_OV_ODBC3, 0);
     SQLAllocHandle(SQL_HANDLE_DBC, hEnv, &hDbc);
@@ -72,7 +71,7 @@ bool DatabaseHelper::registerUser(const std::string& username, const std::string
     SQLHSTMT stmt;
     SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
 
-    // Kiểm tra trùng username
+    
     std::string checkSql = "SELECT 1 FROM [User] WHERE username = ?";
     SQLPrepareA(stmt, (SQLCHAR*)checkSql.c_str(), SQL_NTS);
     SQLLEN lenUser = (SQLLEN)username.size();
@@ -83,21 +82,31 @@ bool DatabaseHelper::registerUser(const std::string& username, const std::string
     if (SQL_SUCCEEDED(ret) && SQLFetch(stmt) == SQL_SUCCESS) {
         std::cerr << "[DB] Username đã tồn tại.\n";
         SQLFreeHandle(SQL_HANDLE_STMT, stmt);
-        return false; // Đã có username này
+        return false; 
     }
 
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
 
-    // Thêm tài khoản mới
+    
     std::string insertSql = "INSERT INTO [User] (username, password) VALUES (?, ?)";
     ret = SQLPrepareA(stmt, (SQLCHAR*)insertSql.c_str(), SQL_NTS);
 
+
+    SQLUINTEGER userColSize = 50;
+    SQLUINTEGER passColSize = 50; 
+
     SQLLEN lenPass = (SQLLEN)password.size();
-    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, username.size(), 0,
-                     (SQLPOINTER)username.c_str(), 0, &lenUser);
-    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, password.size(), 0,
-                     (SQLPOINTER)password.c_str(), 0, &lenPass);
+    
+    lenUser = (SQLLEN)username.size();
+
+    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 
+        userColSize, 
+        0, (SQLPOINTER)username.c_str(), 0, &lenUser);
+        
+    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 
+        passColSize, 
+        0, (SQLPOINTER)password.c_str(), 0, &lenPass);
 
     ret = SQLExecute(stmt);
     if (!SQL_SUCCEEDED(ret)) {
@@ -132,21 +141,27 @@ bool DatabaseHelper::checkLogin(const std::string& username, const std::string& 
     SQLLEN lenUser = (SQLLEN)username.size();
     SQLLEN lenPass = (SQLLEN)password.size();
 
-    // Bind tham số 1: Username
-    ret = SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, username.size(), 0,
-        (SQLPOINTER)username.c_str(), 0, &lenUser);
+    SQLUINTEGER userColSize = 50;
+    SQLUINTEGER passColSize = 50;
 
-    // Bind tham số 2: Password
-    ret = SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, password.size(), 0,
-        (SQLPOINTER)password.c_str(), 0, &lenPass);
 
-    // Thực thi
+    
+    ret = SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 
+        userColSize, 
+        0, (SQLPOINTER)username.c_str(), 0, &lenUser);
+
+    
+    ret = SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 
+        passColSize, 
+        0, (SQLPOINTER)password.c_str(), 0, &lenPass);
+
+   
     ret = SQLExecute(stmt);
     bool success = false;
 
     if (SQL_SUCCEEDED(ret)) {
         if (SQLFetch(stmt) == SQL_SUCCESS) {
-            success = true; // Có user hợp lệ
+            success = true; 
         }
     } else {
         std::cerr << "[DB] SQLExecute thất bại.\n";
@@ -179,20 +194,33 @@ bool DatabaseHelper::saveMessage(const std::string& sender,
     // Nếu không có file hoặc tin nhắn thì lưu rỗng an toàn
     std::string safeContent = message.empty() ? "" : message;
     std::string safeFile = filename.empty() ? "" : filename;
+    
+    SQLUINTEGER senderColSize = 50;   // Giả định Sender là VARCHAR(50)
+    SQLUINTEGER receiverColSize = 50; // Giả định Receiver là VARCHAR(50)
+    SQLUINTEGER msgColSize = 2000;    // Dựa trên getChatHistory dùng message[2000]
+    SQLUINTEGER fileColSize = 255;    // Dựa trên getChatHistory dùng filename[255]
 
     SQLLEN lenSender = (SQLLEN)sender.size();
     SQLLEN lenReceiver = (SQLLEN)receiver.size();
-    SQLLEN lenMessage = (SQLLEN)message.size();
-    SQLLEN lenFile = (SQLLEN)filename.size();
+    SQLLEN lenMessage = (SQLLEN)message.size(); // (Dùng safeContent.size() sẽ an toàn hơn)
+    SQLLEN lenFile = (SQLLEN)filename.size();   // (Dùng safeFile.size() sẽ an toàn hơn)
 
-    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, sender.size(), 0,
-        (SQLPOINTER)sender.c_str(), 0, &lenSender);
-    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, receiver.size(), 0,
-        (SQLPOINTER)receiver.c_str(), 0, &lenReceiver);
-    SQLBindParameter(stmt, 3, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, message.size(), 0,
-        (SQLPOINTER)message.c_str(), 0, &lenMessage);
-    SQLBindParameter(stmt, 4, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, filename.size(), 0,
-        (SQLPOINTER)filename.c_str(), 0, &lenFile);
+
+    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 
+        senderColSize, // <-- SỬA LỖI
+        0, (SQLPOINTER)sender.c_str(), 0, &lenSender);
+
+    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 
+        receiverColSize, // <-- SỬA LỖI
+        0, (SQLPOINTER)receiver.c_str(), 0, &lenReceiver);
+
+    SQLBindParameter(stmt, 3, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 
+        msgColSize, // <-- SỬA LỖI
+        0, (SQLPOINTER)message.c_str(), 0, &lenMessage); // Sửa thành safeContent.c_str() nếu cần
+
+    SQLBindParameter(stmt, 4, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 
+        fileColSize, // <-- SỬA LỖI
+        0, (SQLPOINTER)filename.c_str(), 0, &lenFile);  // Sửa thành safeFile.c_str() nếu cần
 
     ret = SQLExecute(stmt);
     if (!SQL_SUCCEEDED(ret)) {
@@ -275,195 +303,16 @@ std::vector<std::string> DatabaseHelper::getChatHistory(const std::string& usern
 }
 
 
-/*#include "DatabaseHelper.h"
-#include <iostream>
-using namespace std;
-
-DatabaseHelper::DatabaseHelper() : hEnv(NULL), hDbc(NULL), connected(false) {
-    // Cấp phát môi trường ODBC
-    SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &hEnv);
-    SQLSetEnvAttr(hEnv, SQL_ATTR_ODBC_VERSION, (void*)SQL_OV_ODBC3, 0);
-    SQLAllocHandle(SQL_HANDLE_DBC, hEnv, &hDbc);
-}
-
-DatabaseHelper::~DatabaseHelper() {
-    disconnect();
-    if (hEnv) SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
-}
-
-void DatabaseHelper::printSQLError(SQLSMALLINT handleType, SQLHANDLE handle) {
-    SQLWCHAR sqlState[6], message[256];
-    SQLINTEGER nativeError;
-    SQLSMALLINT textLength;
-    SQLRETURN ret;
-
-    int i = 1;
-    while ((ret = SQLGetDiagRecW(handleType, handle, i,
-                sqlState, &nativeError, message, sizeof(message)/sizeof(SQLWCHAR), &textLength)) 
-                != SQL_NO_DATA) 
-    {
-        wcout << L"[ODBC ERROR] SQLSTATE: " << sqlState
-              << L", Message: " << message << endl;
-        i++;
-    }
-}
-
-bool DatabaseHelper::connect(const std::string& connStr) {
-    if (connected) return true;
-
-    SQLCHAR outStr[1024];
-    SQLSMALLINT outLen;
-
-    SQLRETURN ret = SQLDriverConnectA(
-        hDbc,
-        NULL,
-        (SQLCHAR*)connStr.c_str(),
-        SQL_NTS,
-        outStr,
-        sizeof(outStr),
-        &outLen,
-        SQL_DRIVER_NOPROMPT 
-    );
-
-    if (SQL_SUCCEEDED(ret)) {
-        connected = true;
-        return true;
-    } else {
-        std::cerr << "Ket noi SQL Server that bai.\n";
-        printSQLError(SQL_HANDLE_DBC, hDbc);
-        return false;
-    }
-}
-
-void DatabaseHelper::disconnect() {
-    if (connected) {
-        SQLDisconnect(hDbc);
-        SQLFreeHandle(SQL_HANDLE_DBC, hDbc);
-        connected = false;
-    }
-}
-
-// ===================================================
-// 🔹 Kiểm tra login
-// ===================================================
-bool DatabaseHelper::checkLogin(const std::string& username, const std::string& password) {
-    if (!connected) return false;
+bool DatabaseHelper::saveFileHistory(const std::string& sender, const std::string& receiver, const std::string& filename) {
     SQLHSTMT stmt;
     SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
-
-    string sql = "SELECT 1 FROM Users WHERE Username=? AND PasswordHash=?";
-    SQLPrepareA(stmt, (SQLCHAR*)sql.c_str(), SQL_NTS);
-
-    SQLLEN lenUser = (SQLLEN)username.size();
-    SQLLEN lenPass = (SQLLEN)password.size();
-
-    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0,
-        (SQLPOINTER)username.c_str(), 0, &lenUser);
-    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 255, 0,
-        (SQLPOINTER)password.c_str(), 0, &lenPass);
-
-    SQLRETURN ret = SQLExecute(stmt);
-    bool success = false;
-    if (SQL_SUCCEEDED(ret) && SQLFetch(stmt) == SQL_SUCCESS) {
-        success = true;
-    } else if (!SQL_SUCCEEDED(ret)) {
-        printSQLError(SQL_HANDLE_STMT, stmt);
-    }
-
-    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
-    return success;
-}
-
-// ===================================================
-// 🔹 Kiểm tra user tồn tại
-// ===================================================
-bool DatabaseHelper::checkUserExists(const std::string& username) {
-    if (!connected) return false;
-    SQLHSTMT stmt;
-    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
-
-    std::string sql = "SELECT 1 FROM Users WHERE Username = ?";
-    SQLPrepareA(stmt, (SQLCHAR*)sql.c_str(), SQL_NTS);
-
-    SQLLEN lenUser = (SQLLEN)username.size();
-    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR,
-        SQL_VARCHAR, 50, 0, (SQLPOINTER)username.c_str(), 0, &lenUser);
-
-    SQLRETURN ret = SQLExecute(stmt);
-    bool exists = false;
-    if (SQL_SUCCEEDED(ret) && SQLFetch(stmt) == SQL_SUCCESS)
-        exists = true;
-
-    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
-    return exists;
-}
-
-// ===================================================
-// 🔹 Thêm user mới
-// ===================================================
-bool DatabaseHelper::addUser(const std::string& username, const std::string& password) {
-    if (!connected) return false;
-    SQLHSTMT stmt;
-    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
-
-    std::string sql = "INSERT INTO Users (Username, PasswordHash) VALUES (?, ?)";
-    SQLPrepareA(stmt, (SQLCHAR*)sql.c_str(), SQL_NTS);
-
-    SQLLEN lenUser = (SQLLEN)username.size();
-    SQLLEN lenPass = (SQLLEN)password.size();
-
-    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR,
-        50, 0, (SQLPOINTER)username.c_str(), 0, &lenUser);
-    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR,
-        255, 0, (SQLPOINTER)password.c_str(), 0, &lenPass);
-
+    std::string query = "INSERT INTO FileHistory (Sender, Receiver, FileName, Timestamp) VALUES (?, ?, ?, GETDATE())";
+    SQLPrepareA(stmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0, (SQLCHAR*)sender.c_str(), 0, NULL);
+    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0, (SQLCHAR*)receiver.c_str(), 0, NULL);
+    SQLBindParameter(stmt, 3, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 255, 0, (SQLCHAR*)filename.c_str(), 0, NULL);
     SQLRETURN ret = SQLExecute(stmt);
     if (!SQL_SUCCEEDED(ret)) {
-        cerr << "[DB] ❌ Them user that bai.\n";
-        printSQLError(SQL_HANDLE_STMT, stmt);
-        SQLFreeHandle(SQL_HANDLE_STMT, stmt);
-        return false;
-    }
-
-    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
-    cout << "[DB] ✅ Da them user moi: " << username << endl;
-    return true;
-}
-
-// ===================================================
-// 🔹 Lưu tin nhắn
-// ===================================================
-bool DatabaseHelper::saveMessage(const std::string& sender,
-                                 const std::string& receiver,
-                                 const std::string& message,
-                                 const std::string& fileName,
-                                 const std::string& messageType) {
-    if (!connected) return false;
-    SQLHSTMT stmt;
-    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
-
-    std::string sql = "INSERT INTO ChatHistory (SenderID, ReceiverID, Message, FileName, MessageType) "
-                      "SELECT S.UserID, R.UserID, ?, ?, ? "
-                      "FROM Users S "
-                      "LEFT JOIN Users R ON R.Username = ? "
-                      "WHERE S.Username = ?";
-    SQLPrepareA(stmt, (SQLCHAR*)sql.c_str(), SQL_NTS);
-
-    SQLLEN lenMsg = (SQLLEN)message.size();
-    SQLLEN lenFile = (SQLLEN)fileName.size();
-    SQLLEN lenType = (SQLLEN)messageType.size();
-    SQLLEN lenRecv = (SQLLEN)receiver.size();
-    SQLLEN lenSend = (SQLLEN)sender.size();
-
-    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 2000, 0, (SQLPOINTER)message.c_str(), 0, &lenMsg);
-    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 255, 0, (SQLPOINTER)fileName.c_str(), 0, &lenFile);
-    SQLBindParameter(stmt, 3, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 20, 0, (SQLPOINTER)messageType.c_str(), 0, &lenType);
-    SQLBindParameter(stmt, 4, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0, (SQLPOINTER)receiver.c_str(), 0, &lenRecv);
-    SQLBindParameter(stmt, 5, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0, (SQLPOINTER)sender.c_str(), 0, &lenSend);
-
-    SQLRETURN ret = SQLExecute(stmt);
-    if (!SQL_SUCCEEDED(ret)) {
-        std::cerr << "[DB] Lưu tin nhắn thất bại.\n";
         printSQLError(SQL_HANDLE_STMT, stmt);
         SQLFreeHandle(SQL_HANDLE_STMT, stmt);
         return false;
@@ -472,61 +321,146 @@ bool DatabaseHelper::saveMessage(const std::string& sender,
     return true;
 }
 
-// ===================================================
-// 🔹 Lấy lịch sử chat
-// ===================================================
-std::vector<std::string> DatabaseHelper::getHistory(const std::string& username) {
+bool DatabaseHelper::saveCallHistory(const std::string& caller, const std::string& receiver, const std::string& status) {
+    SQLHSTMT stmt;
+    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
+    std::string query = "INSERT INTO CallHistory (Caller, Receiver, Status, Timestamp) VALUES (?, ?, ?, GETDATE())";
+    SQLPrepareA(stmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0, (SQLCHAR*)caller.c_str(), 0, NULL);
+    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0, (SQLCHAR*)receiver.c_str(), 0, NULL);
+    SQLBindParameter(stmt, 3, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 20, 0, (SQLCHAR*)status.c_str(), 0, NULL);
+    SQLRETURN ret = SQLExecute(stmt);
+    if (!SQL_SUCCEEDED(ret)) {
+        printSQLError(SQL_HANDLE_STMT, stmt);
+        SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+        return false;
+    }
+    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+    return true;
+}
+
+
+std::vector<std::string> DatabaseHelper::getFileHistory(const std::string& username) {
     std::vector<std::string> history;
     if (!connected) return history;
 
     SQLHSTMT stmt;
     SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
 
-    std::string sql =
-        "SELECT S.Username AS Sender, R.Username AS Receiver, C.Message, C.FileName, "
-        "CONVERT(VARCHAR, C.SentAt, 120) AS SentTime, C.MessageType "
-        "FROM ChatHistory C "
-        "JOIN Users S ON C.SenderID = S.UserID "
-        "LEFT JOIN Users R ON C.ReceiverID = R.UserID "
-        "WHERE S.Username = ? OR R.Username = ? "
-        "ORDER BY C.SentAt ASC";
+    std::string query =
+        "SELECT Sender, Receiver, FileName, CONVERT(VARCHAR, Timestamp, 120) AS SentTime "
+        "FROM FileHistory "
+        "WHERE Sender = ? OR Receiver = ? "
+        "ORDER BY Timestamp ASC";
 
-    SQLPrepareA(stmt, (SQLCHAR*)sql.c_str(), SQL_NTS);
-    SQLLEN lenUser = (SQLLEN)username.size();
-    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0, (SQLPOINTER)username.c_str(), 0, &lenUser);
-    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0, (SQLPOINTER)username.c_str(), 0, &lenUser);
-
-    SQLRETURN ret = SQLExecute(stmt);
+    SQLRETURN ret = SQLPrepareA(stmt, (SQLCHAR*)query.c_str(), SQL_NTS);
     if (!SQL_SUCCEEDED(ret)) {
+        std::cerr << "[DB] ❌ Lỗi prepare lấy FileHistory\n";
         printSQLError(SQL_HANDLE_STMT, stmt);
         SQLFreeHandle(SQL_HANDLE_STMT, stmt);
         return history;
     }
 
-    SQLCHAR sender[50], receiver[50], message[2000], fileName[255], sentTime[30], msgType[20];
+    SQLLEN lenUser = (SQLLEN)username.size();
+    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0,
+                     (SQLPOINTER)username.c_str(), 0, &lenUser);
+    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0,
+                     (SQLPOINTER)username.c_str(), 0, &lenUser);
+
+    ret = SQLExecute(stmt);
+    if (!SQL_SUCCEEDED(ret)) {
+        std::cerr << "[DB] ❌ Lỗi thực thi lấy FileHistory\n";
+        printSQLError(SQL_HANDLE_STMT, stmt);
+        SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+        return history;
+    }
+
+    SQLCHAR sender[50], receiver[50], filename[255], sentTime[30];
     while (SQLFetch(stmt) == SQL_SUCCESS) {
+        memset(sender, 0, sizeof(sender));
+        memset(receiver, 0, sizeof(receiver));
+        memset(filename, 0, sizeof(filename));
+        memset(sentTime, 0, sizeof(sentTime));
+
         SQLGetData(stmt, 1, SQL_C_CHAR, sender, sizeof(sender), NULL);
         SQLGetData(stmt, 2, SQL_C_CHAR, receiver, sizeof(receiver), NULL);
-        SQLGetData(stmt, 3, SQL_C_CHAR, message, sizeof(message), NULL);
-        SQLGetData(stmt, 4, SQL_C_CHAR, fileName, sizeof(fileName), NULL);
-        SQLGetData(stmt, 5, SQL_C_CHAR, sentTime, sizeof(sentTime), NULL);
-        SQLGetData(stmt, 6, SQL_C_CHAR, msgType, sizeof(msgType), NULL);
+        SQLGetData(stmt, 3, SQL_C_CHAR, filename, sizeof(filename), NULL);
+        SQLGetData(stmt, 4, SQL_C_CHAR, sentTime, sizeof(sentTime), NULL);
 
-        std::string log = "[" + std::string((char*)sentTime) + "] "
-            + std::string((char*)sender) + " → " + std::string((char*)receiver)
-            + " (" + std::string((char*)msgType) + "): ";
-
-        if (strlen((char*)fileName) > 0)
-            log += "[File: " + std::string((char*)fileName) + "]";
-        else
-            log += std::string((char*)message);
-
-        history.push_back(log);
+        std::string record = "[File] " + std::string((char*)sender) + " -> "
+            + std::string((char*)receiver) + ": "
+            + std::string((char*)filename)
+            + " [" + std::string((char*)sentTime) + "]";
+        history.push_back(record);
     }
 
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     return history;
-}*/
+}
+
+std::vector<std::string> DatabaseHelper::getCallHistory(const std::string& username) {
+    std::vector<std::string> history;
+    if (!connected) return history;
+
+    SQLHSTMT stmt;
+    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
+
+    std::string query =
+        "SELECT Caller, Receiver, Status, CONVERT(VARCHAR, Timestamp, 120) AS CallTime "
+        "FROM CallHistory "
+        "WHERE Caller = ? OR Receiver = ? "
+        "ORDER BY Timestamp ASC";
+
+    SQLRETURN ret = SQLPrepareA(stmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+    if (!SQL_SUCCEEDED(ret)) {
+        std::cerr << "[DB] ❌ Lỗi prepare lấy CallHistory\n";
+        printSQLError(SQL_HANDLE_STMT, stmt);
+        SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+        return history;
+    }
+
+    SQLLEN lenUser = (SQLLEN)username.size();
+    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0,
+                     (SQLPOINTER)username.c_str(), 0, &lenUser);
+    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 50, 0,
+                     (SQLPOINTER)username.c_str(), 0, &lenUser);
+
+    ret = SQLExecute(stmt);
+    if (!SQL_SUCCEEDED(ret)) {
+        std::cerr << "[DB] ❌ Lỗi thực thi lấy CallHistory\n";
+        printSQLError(SQL_HANDLE_STMT, stmt);
+        SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+        return history;
+    }
+
+    SQLCHAR caller[50], receiver[50], status[50], callTime[30];
+    while (SQLFetch(stmt) == SQL_SUCCESS) {
+        memset(caller, 0, sizeof(caller));
+        memset(receiver, 0, sizeof(receiver));
+        memset(status, 0, sizeof(status));
+        memset(callTime, 0, sizeof(callTime));
+
+        SQLGetData(stmt, 1, SQL_C_CHAR, caller, sizeof(caller), NULL);
+        SQLGetData(stmt, 2, SQL_C_CHAR, receiver, sizeof(receiver), NULL);
+        SQLGetData(stmt, 3, SQL_C_CHAR, status, sizeof(status), NULL);
+        SQLGetData(stmt, 4, SQL_C_CHAR, callTime, sizeof(callTime), NULL);
+
+        std::string record = "[Call] " + std::string((char*)caller) + " -> "
+            + std::string((char*)receiver) + ": "
+            + std::string((char*)status)
+            + " [" + std::string((char*)callTime) + "]";
+        history.push_back(record);
+    }
+
+    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+    return history;
+}
+
+
+
+
+
+
 
 
 

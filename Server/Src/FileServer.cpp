@@ -1,59 +1,3 @@
-/*#include "fileserver.h"
-#include <iostream>
-#include <fstream>
-#include <vector>
-
-#pragma comment(lib, "ws2_32.lib")
-
-
-bool FileServer::handleIncomingFile(
-    SOCKET senderSock,
-    const std::string& fromUser,
-    const std::string& toUser,
-    const std::string& filename,
-    long long fileSize,
-    std::map<std::string, SOCKET>& clientMap
-) {
-    std::cout << "[INFO] Dang nhan file tu " << fromUser
-              << " gui toi: " << toUser
-              << " | File: " << filename
-              << " | Size: " << fileSize << " bytes\n";
-              
-    auto it = clientMap.find(toUser);
-    if (it == clientMap.end()) {
-        std::cerr << "[WARN] Nguoi dung '" << toUser << "' khong online. File se bi bo qua.\n";
-        // Có thể lưu lại file tạm sau này gửi lại khi B online
-        return false;
-    }
-
-    SOCKET receiverSock = it->second;
-
-    // Bước 1: Gửi thông báo JSON cho client B để chuẩn bị nhận file
-    std::string notify = "{ \"action\": \"sendfile\", \"from\": \"" + fromUser +
-                     "\", \"filename\": \"" + filename +
-                     "\", \"size\": \"" + std::to_string(fileSize) + "\" }";
-    send(receiverSock, notify.c_str(), notify.size(), 0);
-
-    // Bước 2: Đọc dữ liệu file từ A và gửi sang B
-    const int CHUNK = 4096;
-    std::vector<char> buffer(CHUNK);
-    long long received = 0;
-
-    while (received < fileSize) {
-        int r = recv(senderSock, buffer.data(), CHUNK, 0);
-        if (r <= 0) {
-            std::cerr << "[ERROR] Mat ket noi khi nhan file.\n";
-            return false;
-        }
-
-        send(receiverSock, buffer.data(), r, 0);
-        received += r;
-    }
-
-    std::cout << "[SUCCESS] File '" << filename << "' da gui toi " << toUser << " thanh cong.\n";
-    return true;
-}*/
-
 #include "FileServer.h"
 #include <iostream>
 #include <fstream>
@@ -183,30 +127,6 @@ void FileServer::startFileServer(std::map<std::string, SOCKET>& clientMap) {
     }
 }
 
-/*#include "FileServer.h"
-#include <iostream>
-
-void FileServer::startFileServer(std::map<std::string, SOCKET>& clientMap) {
-    std::cout << "[FileServer] Started file server stub.\n";
-}
-
-bool FileServer::handleIncomingFile(
-    SOCKET senderSock,
-    const std::string& fromUser,
-    const std::string& toUser,
-    const std::string& filename,
-    long long fileSize,
-    std::map<std::string, SOCKET>& clientMap
-) {
-    std::cout << "[FileServer] Simulate file transfer from " << fromUser
-              << " to " << toUser << " (file: " << filename << ", size: " << fileSize << ")\n";
-    return true;
-}
-
-std::string FileServer::handleFile(const std::string& request) {
-    std::cout << "[FileServer] Received file request: " << equest << "\n";
-    return R"({"action":"file_ok","status":"success"})";
-}*/
 
 
 

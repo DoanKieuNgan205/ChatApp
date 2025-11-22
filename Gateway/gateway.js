@@ -7,34 +7,24 @@ import cors from "cors";
 import path from "path";
 
 const WS_PORT = 3000;
-const HTTP_PORT = 3001; // ✅ Đổi tên cổng HTTP
+const HTTP_PORT = 3001; 
 const TCP_HOST = "127.0.0.1";
-// Cổng server C++ (Chat/Login)
 const TCP_PORT = 8888;
-// Cổng server C++ (File)
-const TCP_PORT_FILE = 9999; // ✅ cổng file riêng
-
+const TCP_PORT_FILE = 9999; 
 
 const wss = new WebSocketServer({ port: WS_PORT });
 console.log(`[Gateway] 🌐 WebSocket Server lắng nghe tại ws://localhost:${WS_PORT}`);
-
 const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: "50mb", type: "application/json; charset=utf-8" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+const upload = multer({ dest: "./uploads" }); 
 
-const upload = multer({ dest: "./uploads" }); // thư mục lưu tạm
+const clientsOnline = {}; 
+const chatHistory = {}; 
 
-
-// 💾 Danh sách client frontend đang online
-const clientsOnline = {}; // { username: ws }
-
-// 💾 Bộ nhớ tạm lưu tin nhắn (text + file)
-const chatHistory = {}; // { "userA_userB": [ {from,to,message,file,filename} ] }
-
-// 🔁 Hàm gửi danh sách người dùng đang online
 function broadcastUserList() {
   const users = Object.keys(clientsOnline);
   const payload = JSON.stringify({ action: "online_list", users });
@@ -43,31 +33,22 @@ function broadcastUserList() {
   }
 }
 
-
-// ============================================
-// Xử lý kết nối từ WebSocket (frontend)
-// ============================================
 wss.on("connection", (ws) => {
   console.log("[Gateway] ✅ Frontend kết nối mới");
 
-  // Kết nối TCP tới C++ server
   const tcpClient = new net.Socket();
   tcpClient.connect(TCP_PORT, TCP_HOST, () => {
     console.log(`[Gateway] 🔌 Đã kết nối tới Server C++ (${TCP_HOST}:${TCP_PORT})`);
   });
 
-  // ============================
-  // Khi nhận dữ liệu từ Web UI
-  // ============================
   ws.on("message", (msg) => {
     try {
       const data = JSON.parse(msg.toString());
       console.log("[Gateway] ⬇️ Nhận từ Web:", data);
 
       switch (data.action) {
-        // 🔹 Gửi đăng nhập sang C++ server
+        
         case "login":
-          //tcpClient.write(JSON.stringify(data));
 
           if (!data.username || !data.password) {
             console.warn("[Gateway] ⚠️ Bỏ qua login trống:", data);
@@ -81,14 +62,12 @@ wss.on("connection", (ws) => {
           }
           break;
 
-        // 🔹 Khi frontend xác nhận login thành công và join vào chat
         case "join_chat":
           clientsOnline[data.username] = ws;
           ws.username = data.username;
           console.log(`[Gateway] 👤 ${data.username} đã tham gia chat`);
           broadcastUserList();
 
-          // ✅ 4. Gửi đăng ký UDP cho user này
           const registerMsg = `REGISTER:${data.username}`;
           udpSocket.send(registerMsg, UDP_PORT_CPP, UDP_HOST_CPP, (err) => {
             if (err)
@@ -104,9 +83,8 @@ wss.on("connection", (ws) => {
 
           break;
 
-        // 🔹 Chat riêng giữa 2 user (text hoặc file)
         case "private": {      
-          if (data.filepath) {  // frontend gửi đường dẫn file thật
+          if (data.filepath) { 
             const filePath = data.filepath;
             const filename = data.filename;
             const tcpFileClient = new net.Socket();
@@ -117,7 +95,6 @@ wss.on("connection", (ws) => {
             tcpFileClient.connect(TCP_PORT_FILE, TCP_HOST, () => {
               console.log(`[Gateway] 📦 Kết nối server file (${TCP_PORT_FILE})`);
 
-              // Gửi header JSON
               const header = JSON.stringify({
                 action: "sendfile",
                 from: data.from,
@@ -127,14 +104,12 @@ wss.on("connection", (ws) => {
               }) + "\n";
               tcpFileClient.write(header);
 
-              // Pipe file binary thật
               const fileStream = fs.createReadStream(data.filepath);
               fileStream.pipe(tcpFileClient, { end: false });
 
               fileStream.on("end", () => {
                 console.log(`[Gateway] ✅ Gửi xong file '${filename}'`);
-                tcpFileClient.end(); // ✅ chỉ đóng sau khi gửi xong
-                // 🔹 Gửi thông báo file cho người nhận qua WebSocket
+                tcpFileClient.end(); 
                 const toClient = clientsOnline[data.to];
                 if (toClient) {
                   toClient.send(JSON.stringify({
@@ -144,7 +119,7 @@ wss.on("connection", (ws) => {
                     filename
                   }));
                 }
-                //setTimeout(() => fs.unlinkSync(filePath), 500); // xóa file tạm sau 0.5s
+                
                 setTimeout(() => {
                   fs.unlink(filePath, (err) => {
                     if (err) console.warn("[Gateway] ⚠️ Không thể xóa file tạm:", err.message);
@@ -174,7 +149,7 @@ wss.on("connection", (ws) => {
           } 
           
           else if (data.message) {
-              // Tin nhắn text
+              
               const toClient = clientsOnline[data.to];
               if (toClient) {
                 toClient.send(
@@ -186,10 +161,10 @@ wss.on("connection", (ws) => {
                 );
               }
             }
-            break; // ✅ Thêm dòng này
+            break; 
         }
 
-        // 🔹 Khi frontend yêu cầu lịch sử chat giữa 2 người
+        
         case "history_request": {
           const key1 = `${data.username}_${data.with}`;
           const key2 = `${data.with}_${data.username}`;
@@ -204,7 +179,7 @@ wss.on("connection", (ws) => {
         }
 
 
-        // 🔹 Các hành động khác gửi qua TCP
+        
         case "register":
         case "list":
           tcpClient.write(JSON.stringify(data));
@@ -218,9 +193,7 @@ wss.on("connection", (ws) => {
     }
   });
 
-  // ==========================
-  //  Khi nhận dữ liệu từ C++ Server
-  // ==========================
+  
   tcpClient.on("data", (chunk) => {
     const raw = chunk.toString().trim();
     console.log("[Gateway] 📩 Nhận từ Server C++:", raw);
@@ -228,7 +201,6 @@ wss.on("connection", (ws) => {
     try {
       const data = JSON.parse(raw);
 
-      // ✅ Trả kết quả login về frontend
       if (data.message === "LOGIN_SUCCESS") {
         ws.send(
           JSON.stringify({
@@ -246,7 +218,7 @@ wss.on("connection", (ws) => {
           })
         );
       }
-          // ✅ Trả kết quả đăng ký về frontend
+        
     else if (data.message === "REGISTER_SUCCESS") {
       console.log("[Gateway] 🟢 Đăng ký thành công từ C++ Server");
       ws.send(
@@ -272,9 +244,7 @@ wss.on("connection", (ws) => {
     }
   });
 
-  // =============================
-  // Khi Web client ngắt kết nối
-  // =============================
+
   ws.on("close", () => {
     console.log("[Gateway] 📴 Web client ngắt kết nối");
     if (ws.username && clientsOnline[ws.username]) {
@@ -290,17 +260,14 @@ wss.on("connection", (ws) => {
 });
 
 
-// =============================
-// 🧱 HTTP Upload File
-// =============================
+
 const uploadDir = path.resolve("./uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
 const storage = multer.diskStorage({
   destination: uploadDir,
   filename: (req, file, cb) => {
-    // Giữ timestamp để tránh trùng tên nhưng vẫn chứa tên gốc
-    //const safeName = Date.now() + "-" + file.originalname;
+    
     const originalName = Buffer.from(file.originalname, "latin1").toString("utf8");
     const safeName = Date.now() + "-" + originalName;
     cb(null, safeName);
@@ -308,7 +275,7 @@ const storage = multer.diskStorage({
 });
 const uploadFixed = multer({ storage });
 
-// 📤 Upload file
+
 app.post("/upload", uploadFixed.single("file"), (req, res) => {
   try {
     const { from, to } = req.body;
@@ -316,14 +283,14 @@ app.post("/upload", uploadFixed.single("file"), (req, res) => {
 
     console.log(`[Gateway] 📤 Upload file từ ${from} → ${to}: ${filename} (${size} bytes)`);
 
-    // ✅ Gửi phản hồi cho frontend (link HTTP thật)
+    
     res.json({
       success: true,
       filename: req.file.originalname,
       previewUrl: `/download/${filename}`,
     });
 
-    // ✅ Gửi thông báo file tới người nhận (qua WebSocket)
+    
     const toClient = clientsOnline[to];
     if (toClient) {
       const utf8Name = Buffer.from(req.file.originalname, "latin1").toString("utf8");
@@ -333,7 +300,7 @@ app.post("/upload", uploadFixed.single("file"), (req, res) => {
         action: "private",
         from,
         file: `/download/${filename}`,
-        filename: utf8Name, // ✅ tên chuẩn UTF-8
+        filename: utf8Name, 
       }));
 
     }
@@ -343,14 +310,13 @@ app.post("/upload", uploadFixed.single("file"), (req, res) => {
   }
 });
 
-// 📥 Endpoint tải file: giữ nguyên tên thật
 app.get("/download/:filename", (req, res) => {
   const filePath = path.join(uploadDir, req.params.filename);
   if (!fs.existsSync(filePath)) return res.status(404).send("File không tồn tại!");
 
-  // 🧠 Giữ nguyên tên thật (bỏ timestamp)
+  
   const originalName = req.params.filename.split("-").slice(1).join("-");
-  //res.download(filePath, originalName);
+  
   res.setHeader("Content-Disposition",
     `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`
   );
@@ -358,7 +324,7 @@ app.get("/download/:filename", (req, res) => {
 
 });
 
-// ✅ Cho phép truy cập /uploads trực tiếp (dùng khi xem ảnh)
+
 app.use("/uploads", express.static(uploadDir));
 
 app.listen(3001, () => {

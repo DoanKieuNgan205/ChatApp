@@ -10,21 +10,22 @@
 #include <map>
 #include <vector>
 #include <string>
-#include <algorithm> // Cho std::remove
-#include <thread>    // Cho std::thread
+#include <algorithm> 
+#include <thread>    
+
 
 
 using namespace std;
 
-extern DatabaseHelper db; // dùng lại biến db từ main
+extern DatabaseHelper db; 
 
 vector<SOCKET> clients;
-//map<string, SOCKET> userMap; 
+ 
 mutex mtx;
-FileServer fileServer;     // ✅ tạo 1 đối tượng FileServer toàn cục
-VoiceServer voiceServer;   // ✅ Server phụ trách truyền âm thanh UDP
+FileServer fileServer;     
+VoiceServer voiceServer;   
 
-// 🔹 Hàm tách field từ JSON đơn giản
+
 string parseField(const string& json, const string& field) {
     size_t pos = json.find("\"" + field + "\"");
     if (pos == string::npos) return "";
@@ -37,7 +38,7 @@ string parseField(const string& json, const string& field) {
     return json.substr(pos + 1, end - pos - 1);
 }
 
-// 🔹 Gửi tin nhắn đến tất cả client trừ người gửi
+
 void broadcast(const string& msg, SOCKET sender) {
     lock_guard<mutex> lock(mtx);
     for (SOCKET c : clients) {
@@ -50,7 +51,7 @@ void broadcast(const string& msg, SOCKET sender) {
     }
 }
 
-// 🔹 Gửi tin nhắn riêng
+
 void sendToUser(const string& username, const string& msg) {
     lock_guard<mutex> lock(mtx);
     auto it = userMap.find(username);
@@ -59,7 +60,7 @@ void sendToUser(const string& username, const string& msg) {
     }
 }
 
-// 🔹 Gửi danh sách user online cho tất cả client
+
 void sendOnlineList() {
     lock_guard<mutex> lock(mtx);
     string list = "{ \"action\": \"online_list\", \"users\": [";
@@ -76,13 +77,13 @@ void sendOnlineList() {
     }
 }
 
-// 🔹 Xử lý từng client
+
 void handleClient(SOCKET client) {
     string request;
     char buf[4096];
     int bytes = 0;
 
-    // Nhận gói login (có thể đến nhiều đợt)
+    
     while (true) {
         bytes = recv(client, buf, sizeof(buf)-1, 0);
         if (bytes <= 0) {
@@ -92,23 +93,23 @@ void handleClient(SOCKET client) {
         buf[bytes] = '\0';
         request += buf;
 
-        // Khi nhận đủ JSON có "}" thì thoát vòng lặp
+        
         if (request.find('}') != string::npos) break;
     }
 
     string action = parseField(request, "action");
 
-    // ✅ Nếu client gửi yêu cầu đăng ký tài khoản
+    
     if (action == "register") {
         string result = RegisterController::handleRegister(request);
         send(client, result.c_str(), (int)result.size(), 0);
         closesocket(client);
-        return; // không cần giữ kết nối sau khi đăng ký
+        return; 
     }
 
-    // ✅ Nếu client gửi yêu cầu đăng nhập
+    
     else if (action == "login") {
-        // Kiểm tra login bằng DB (qua LoginController + Auth + DatabaseHelper)
+        
         string loginResult = LoginController::handleLogin(request);
         string username = parseField(request, "username");
         if (username.empty()) {
@@ -117,7 +118,7 @@ void handleClient(SOCKET client) {
             return;
         }
 
-        // thêm \n cho JSON login
+        
         loginResult += "\n";
         send(client, loginResult.c_str(), (int)loginResult.size(), 0);
 
@@ -127,6 +128,7 @@ void handleClient(SOCKET client) {
         cout << "[DEBUG] status parse: " << status << endl;
         if (status != "success") {
             cout << "[DEBUG] Login failed for user: " << username << endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             closesocket(client);
             return;
         }
@@ -137,27 +139,51 @@ void handleClient(SOCKET client) {
             clients.push_back(client);
             userMap[username] = client;
         }
-        sendOnlineList(); // ✅ gửi danh sách online sau khi user vào
+        sendOnlineList(); 
 
         cout << "[INFO] User login: " << username << endl;
 
-        // Gửi lịch sử chat cho user sau khi đăng nhập
-        vector<string> history = db.getChatHistory(username);
-        if (!history.empty()) {
-            cout << "[INFO] Gui lich su chat cho user: " << username << " (" << history.size() << " tin nhan)\n";
-            for (auto& line : history) {
-                string safeMsg = line;
-                // Escape ký tự " để không lỗi JSON
-                for (size_t pos = 0; (pos = safeMsg.find("\"", pos)) != string::npos; pos += 2)
-                    safeMsg.replace(pos, 1, "\\\"");
-
-                string formatted = "{ \"action\": \"history\", \"message\": \"" + safeMsg + "\" }\n";
-                send(client, formatted.c_str(), (int)formatted.size(), 0);
-            }
-        }
+        vector<string> chatHistory = db.getChatHistory(username);
+        vector<string> fileHistory = db.getFileHistory(username);
+        vector<string> callHistory = db.getCallHistory(username);
 
         
-        // Vòng lặp chat
+        auto escape = [](string s) {
+            string r = "";
+            for (char c : s) {
+                if (c == '\"') r += "\\\"";
+                else r += c;
+            }
+            return r;
+        };
+
+        string json = "{ \"action\": \"history_response\", \"chat\": [";
+
+        for (int i = 0; i < chatHistory.size(); i++) {
+            json += "\"" + escape(chatHistory[i]) + "\"";
+            if (i < chatHistory.size()-1) json += ",";
+        }
+
+        json += "], \"file\": [";
+
+        for (int i = 0; i < fileHistory.size(); i++) {
+            json += "\"" + escape(fileHistory[i]) + "\"";
+            if (i < fileHistory.size()-1) json += ",";
+        }
+
+        json += "], \"call\": [";
+
+        for (int i = 0; i < callHistory.size(); i++) {
+            json += "\"" + escape(callHistory[i]) + "\"";
+            if (i < callHistory.size()-1) json += ",";
+        }
+
+        json += "] }\n";
+
+        send(client, json.c_str(), (int)json.size(), 0);
+
+        
+        
         while (true) {
             int bytes = recv(client, buf, sizeof(buf)-1, 0);
             if (bytes <= 0) break;
@@ -187,13 +213,13 @@ void handleClient(SOCKET client) {
                 string to = parseField(msg, "to");
                 string message = parseField(msg, "message");
                 if (!from.empty() && !to.empty() && !message.empty()) {
-                    // Tạo gói JSON chuẩn
+                    
                     string chatMsg = "{ \"action\": \"private\", \"from\": \"" + from +
                                     "\", \"to\": \"" + to +
                                     "\", \"message\": \"" + message + "\" }\n";
                     sendToUser(to, chatMsg);
                     sendToUser(from, chatMsg);
-                    db.saveMessage(from, to, message); // Lưu tin nhắn vào DB
+                    db.saveMessage(from, to, message); 
                 }
             }
             
@@ -206,9 +232,10 @@ void handleClient(SOCKET client) {
 
                 cout << "[INFO] " << from << " muon gui file " << filename << " (" << sizeStr << " bytes) -> " << to << endl;
 
-                // Trả lời client biết rằng hãy mở kết nối riêng đến port 9999
+                
                 string notify = "{ \"action\": \"file_ready\", \"port\": 9999, \"message\": \"Hay gui file qua cong 9999\" }\n";
                 send(client, notify.c_str(), notify.size(), 0);
+                db.saveFileHistory(from, to, filename);
             }
             
             else if (action == "voice_register") {
@@ -244,20 +271,21 @@ void handleClient(SOCKET client) {
                     continue;
                 }
 
-                // Gửi yêu cầu tới người nhận
+                
                 string callMsg = "{ \"action\": \"incoming_call\", \"from\": \"" + from + "\" }\n";
                 sendToUser(to, callMsg);
                 cout << "[VOICE] Cuộc gọi voice từ " << from << " đến " << to << endl;
+                db.saveCallHistory(from, to, "started");
             }
             
 
-            else { // Chat chung
+            else { 
                 string message = parseField(msg, "message");
                 if (!username.empty() && !message.empty()) {
                     string chatMsg = username + ": " + message;
                     cout << chatMsg << endl;
                     broadcast(chatMsg, client);
-                    db.saveMessage(username, "ALL", message); // Lưu chat chung
+                    db.saveMessage(username, "ALL", message); 
                 }
             }
         }
@@ -268,7 +296,7 @@ void handleClient(SOCKET client) {
             userMap.erase(username);
         }
         closesocket(client);
-        sendOnlineList(); // ✅ gửi lại danh sách khi user thoát
+        sendOnlineList(); 
 
         cout << "[INFO] User disconnected: " << username << endl;
     }
@@ -280,146 +308,230 @@ void handleClient(SOCKET client) {
     }
 }
 
-/*#include "ChatServer.h"
-#include "DatabaseHelper.h"
-#include "Packet.h"
-#include <iostream>
-#include <mutex>
-#include <map>
-#include <vector>
-#include <algorithm>
+/*void handleClient(SOCKET client) {
+    string username;        // username dùng toàn bộ function
+    char buf[4096];
+    int bytes = 0;
 
-using namespace std;
+    // Nhận dữ liệu từ client
+    while (true) {
+        bytes = recv(client, buf, sizeof(buf) - 1, 0);
+        if (bytes <= 0) break;
+        buf[bytes] = '\0';
+        string msg(buf);
 
-// Dùng biến toàn cục đã khai báo ở main
-extern DatabaseHelper db;
-extern std::map<std::string, SOCKET> userMap;
-extern std::mutex mtx;
-extern std::vector<SOCKET> clients;
+        string action = parseField(msg, "action");
 
-// 🔹 Hàm phụ: parse field từ JSON (đơn giản)
-static std::string parseField(const std::string& json, const std::string& field) {
-    size_t pos = json.find("\"" + field + "\"");
-    if (pos == string::npos) return "";
-    pos = json.find(":", pos);
-    if (pos == string::npos) return "";
-    pos = json.find("\"", pos);
-    if (pos == string::npos) return "";
-    size_t end = json.find("\"", pos + 1);
-    if (end == string::npos) return "";
-    return json.substr(pos + 1, end - pos - 1);
-}
-
-// 🔹 Gửi tin nhắn tới toàn bộ client trừ người gửi
-void ChatServer::broadcast(const std::string& msg, SOCKET sender) {
-    lock_guard<mutex> lock(mtx);
-    for (SOCKET c : clients) {
-        if (c != sender) {
-            send(c, msg.c_str(), (int)msg.size(), 0);
+        // ====== XỬ LÝ ĐĂNG KÝ ======
+        if (action == "register") {
+            string result = RegisterController::handleRegister(msg);
+            send(client, result.c_str(), (int)result.size(), 0);
+            closesocket(client);
+            return;
         }
-    }
-}
 
-// 🔹 Gửi riêng tin nhắn đến user
-void ChatServer::sendToUser(const std::string& username, const std::string& msg) {
-    lock_guard<mutex> lock(mtx);
-    auto it = userMap.find(username);
-    if (it != userMap.end()) {
-        send(it->second, msg.c_str(), (int)msg.size(), 0);
-    }
-}
-
-// 🔹 Xử lý gói chat JSON từ client
-std::string ChatServer::handleChat(const std::string& jsonRequest) {
-    std::string action = parseField(jsonRequest, "action");
-    std::string from = parseField(jsonRequest, "from");
-    std::string to = parseField(jsonRequest, "to");
-    std::string message = parseField(jsonRequest, "message");
-    std::string username = parseField(jsonRequest, "username");
-
-    // ✅ Người dùng vừa JOIN chat
-    if (action == "join_chat") {
-        std::lock_guard<std::mutex> lock(mtx);
-        if (!username.empty()) {
-            userMap[username] = INVALID_SOCKET; // sẽ được cập nhật khi accept socket thực
-            std::cout << "[JOIN] " << username << " đã tham gia phòng chat.\n";
-
-            // Gửi danh sách online về Gateway (hoặc các client khác)
-            std::string listMsg = "{ \"action\": \"online_list\", \"users\": [";
-            bool first = true;
-            for (auto& p : userMap) {
-                if (!first) listMsg += ",";
-                listMsg += "\"" + p.first + "\"";
-                first = false;
+        // ====== XỬ LÝ ĐĂNG NHẬP ======
+        else if (action == "login") {
+            string loginResult = LoginController::handleLogin(msg);
+            username = parseField(msg, "username");
+            if (username.empty()) {
+                cout << "[WARN] Username trống — đóng kết nối\n";
+                closesocket(client);
+                return;
             }
-            listMsg += "] }";
 
-            return listMsg;
+            loginResult += "\n";
+            send(client, loginResult.c_str(), (int)loginResult.size(), 0);
+
+            string status = parseField(loginResult, "status");
+            if (status != "success") {
+                cout << "[DEBUG] Login failed for user: " << username << endl;
+                closesocket(client);
+                return;
+            }
+
+            // Thêm client vào danh sách
+            {
+                lock_guard<mutex> lock(mtx);
+                clients.push_back(client);
+                userMap[username] = client;
+            }
+            sendOnlineList();
+            cout << "[INFO] User login: " << username << endl;
+
+            // Gửi lịch sử tổng hợp
+            vector<string> chatHistory = db.getChatHistory(username);
+            vector<string> fileHistory = db.getFileHistory(username);
+            vector<string> callHistory = db.getCallHistory(username);
+
+            auto escape = [](string s) {
+                string r = "";
+                for (char c : s) {
+                    if (c == '\"') r += "\\\"";
+                    else r += c;
+                }
+                return r;
+            };
+
+            string json = "{ \"action\": \"history_response\", \"chat\": [";
+            for (int i = 0; i < chatHistory.size(); i++) {
+                json += "\"" + escape(chatHistory[i]) + "\"";
+                if (i < chatHistory.size() - 1) json += ",";
+            }
+            json += "], \"file\": [";
+            for (int i = 0; i < fileHistory.size(); i++) {
+                json += "\"" + escape(fileHistory[i]) + "\"";
+                if (i < fileHistory.size() - 1) json += ",";
+            }
+            json += "], \"call\": [";
+            for (int i = 0; i < callHistory.size(); i++) {
+                json += "\"" + escape(callHistory[i]) + "\"";
+                if (i < callHistory.size() - 1) json += ",";
+            }
+            json += "] }\n";
+            send(client, json.c_str(), (int)json.size(), 0);
         }
-        return R"({"action":"error","message":"Thiếu username trong join_chat"})";
-    }
 
-    // ✅ Chat riêng
-    if (action == "private") {
-        if (from.empty() || to.empty() || message.empty())
-            return R"({"action":"error","message":"Thiếu tham số trong gói tin chat"})";
-
-        std::string formatted =
-            "{ \"action\": \"private\", \"from\": \"" + from +
-            "\", \"to\": \"" + to +
-            "\", \"message\": \"" + message + "\" }\n";
-
-        sendToUser(to, formatted);
-        sendToUser(from, formatted);
-
-        db.saveMessage(from, to, message, "", "text");
-
-        std::cout << "[CHAT] " << from << " -> " << to << ": " << message << std::endl;
-
-        return R"({"action":"private_ok","status":"success"})";
-    }
-
-
-    // ✅ Chat broadcast (toàn bộ)
-    else if (action == "public") {
-        if (from.empty() || message.empty())
-            return R"({"action":"error","message":"Thiếu tham số trong broadcast"})";
-
-        std::string formatted =
-            "{ \"action\": \"public\", \"from\": \"" + from +
-            "\", \"message\": \"" + message + "\" }\n";
-
-        SOCKET senderSock = INVALID_SOCKET;
-        {
-            std::lock_guard<std::mutex> lock(mtx);
-            auto it = userMap.find(from);
-            if (it != userMap.end()) senderSock = it->second;
+        // ====== XỬ LÝ DANH SÁCH ONLINE ======
+        else if (action == "list") {
+            string list = "{ \"action\": \"online_list\", \"users\": [";
+            {
+                lock_guard<mutex> lock(mtx);
+                bool first = true;
+                for (const auto& pair : userMap) {
+                    if (!first) list += ",";
+                    list += "\"" + pair.first + "\"";
+                    first = false;
+                }
+            }
+            list += "] }\n";
+            send(client, list.c_str(), (int)list.size(), 0);
         }
 
-        broadcast(formatted, senderSock);
-        db.saveMessage(from, "ALL", message, "", "text");
-
-        std::cout << "[BROADCAST] " << from << ": " << message << std::endl;
-
-        return R"({"action":"broadcast_ok","status":"success"})";
-    }
-
-    // ✅ Lấy lịch sử chat
-    else if (action == "history") {
-        std::vector<std::string> history = db.getHistory(from);
-        std::string result = "{ \"action\": \"history\", \"messages\": [";
-        for (size_t i = 0; i < history.size(); ++i) {
-            if (i > 0) result += ",";
-            result += "\"" + history[i] + "\"";
+        // ====== XỬ LÝ CHAT RIÊNG ======
+        else if (action == "private") {
+            string from = parseField(msg, "from");
+            string to = parseField(msg, "to");
+            string message = parseField(msg, "message");
+            if (!from.empty() && !to.empty() && !message.empty()) {
+                string chatMsg = "{ \"action\": \"private\", \"from\": \"" + from +
+                                 "\", \"to\": \"" + to +
+                                 "\", \"message\": \"" + message + "\" }\n";
+                sendToUser(to, chatMsg);
+                sendToUser(from, chatMsg);
+                db.saveMessage(from, to, message);
+            }
         }
-        result += "] }";
-        return result;
+
+        // ====== XỬ LÝ CHAT CHUNG ======
+        else if (action == "broadcast") {
+            string message = parseField(msg, "message");
+            if (!username.empty() && !message.empty()) {
+                string chatMsg = username + ": " + message;
+                cout << chatMsg << endl;
+                broadcast(chatMsg, client);
+                db.saveMessage(username, "ALL", message);
+            }
+        }
+
+        // ====== XỬ LÝ FILE ======
+        else if (action == "sendfile") {
+            string from = parseField(msg, "from");
+            string to = parseField(msg, "to");
+            string filename = parseField(msg, "filename");
+            string sizeStr = parseField(msg, "size");
+            string notify = "{ \"action\": \"file_ready\", \"port\": 9999, \"message\": \"Hay gui file qua cong 9999\" }\n";
+            send(client, notify.c_str(), (int)notify.size(), 0);
+            db.saveFileHistory(from, to, filename);
+        }
+
+        // ====== XỬ LÝ VOICE ======
+        else if (action == "voice_register") {
+            string uname = parseField(msg, "username");
+            string ip = parseField(msg, "ip");
+            string portStr = parseField(msg, "port");
+
+            if (uname.empty() || ip.empty() || portStr.empty()) {
+                string err = R"({ "action": "error", "message": "Thong tin voice_register khong hop le" })";
+                send(client, err.c_str(), (int)err.size(), 0);
+                continue;
+            }
+
+            sockaddr_in addr;
+            addr.sin_family = AF_INET;
+            inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);
+            addr.sin_port = htons(stoi(portStr));
+
+            voiceServer.registerClient(uname, addr);
+            string ok = R"({ "action": "voice_register_ok", "message": "Da dang ky voice thanh cong" })" "\n";
+            send(client, ok.c_str(), (int)ok.size(), 0);
+            cout << "[VOICE] " << uname << " đăng ký địa chỉ UDP " << ip << ":" << portStr << endl;
+        }
+        else if (action == "voice_call") {
+            string from = parseField(msg, "from");
+            string to = parseField(msg, "to");
+            if (from.empty() || to.empty()) {
+                string err = R"({ "action": "error", "message": "Thông tin cuộc gọi không hợp lệ" })";
+                send(client, err.c_str(), (int)err.size(), 0);
+                continue;
+            }
+            string callMsg = "{ \"action\": \"incoming_call\", \"from\": \"" + from + "\" }\n";
+            sendToUser(to, callMsg);
+            db.saveCallHistory(from, to, "started");
+        }
+
+        // ====== XỬ LÝ LỊCH SỬ ======
+        else if (action == "get_history") {
+            string reqUsername = parseField(msg, "username");
+            if (reqUsername.empty()) reqUsername = username;
+
+            vector<string> chatHistory = db.getChatHistory(reqUsername);
+            vector<string> fileHistory = db.getFileHistory(reqUsername);
+            vector<string> callHistory = db.getCallHistory(reqUsername);
+
+            auto escape = [](string s) {
+                string r = "";
+                for (char c : s) {
+                    if (c == '\"') r += "\\\"";
+                    else r += c;
+                }
+                return r;
+            };
+
+            string json = "{ \"action\": \"history_response\", \"chat\": [";
+            for (int i = 0; i < chatHistory.size(); i++) {
+                json += "\"" + escape(chatHistory[i]) + "\"";
+                if (i < chatHistory.size() - 1) json += ",";
+            }
+            json += "], \"file\": [";
+            for (int i = 0; i < fileHistory.size(); i++) {
+                json += "\"" + escape(fileHistory[i]) + "\"";
+                if (i < fileHistory.size() - 1) json += ",";
+            }
+            json += "], \"call\": [";
+            for (int i = 0; i < callHistory.size(); i++) {
+                json += "\"" + escape(callHistory[i]) + "\"";
+                if (i < callHistory.size() - 1) json += ",";
+            }
+            json += "] }\n";
+            send(client, json.c_str(), (int)json.size(), 0);
+        }
+
+        // ====== XỬ LÝ UNKNOWN ======
+        else {
+            string err = R"({ "action": "error", "message": "Unknown action" })" "\n";
+            send(client, err.c_str(), (int)err.size(), 0);
+        }
     }
-    
-    // ❌ Không hợp lệ
-    else {
-        return R"({"action":"error","message":"Unknown chat action"})";
+
+    // Khi client thoát
+    {
+        lock_guard<mutex> lock(mtx);
+        clients.erase(remove(clients.begin(), clients.end(), client), clients.end());
+        if (!username.empty()) userMap.erase(username);
     }
+    closesocket(client);
+    sendOnlineList();
+    cout << "[INFO] User disconnected: " << username << endl;
 }*/
-
 

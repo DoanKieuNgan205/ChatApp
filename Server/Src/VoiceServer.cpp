@@ -41,16 +41,21 @@ void VoiceServer::stop() {
 }
 
 void VoiceServer::run() {
-    char buffer[4096];
+    
+    const int BUFSIZE = 65536;
+    std::vector<char> buffer(BUFSIZE);
     sockaddr_in clientAddr;
-    int clientAddrLen = sizeof(clientAddr);
+    socklen_t clientAddrLen = sizeof(clientAddr);
+
 
     while (running) {
-        int bytesReceived = recvfrom(udpSocket, buffer, sizeof(buffer), 0,
+        int bytesReceived = recvfrom(udpSocket, buffer.data(), (int)buffer.size(), 0,
                                      (sockaddr*)&clientAddr, &clientAddrLen);
-        if (bytesReceived <= 0) continue;
+        if (bytesReceived == SOCKET_ERROR || bytesReceived <= 0) {
+            continue;
+        }
 
-        std::string msg(buffer, bytesReceived);
+        std::string msg(buffer.data(), bytesReceived);
 
         if (msg.rfind("REGISTER:", 0) == 0) {
             std::string username = msg.substr(9);
@@ -59,7 +64,6 @@ void VoiceServer::run() {
             continue;
         }
 
-        // 🚀 THÊM KHỐI LỆNH NÀY
         if (msg.rfind("UNREGISTER:", 0) == 0) {
             std::string username = msg.substr(11);
             handleUnregister(username);
@@ -81,19 +85,28 @@ void VoiceServer::run() {
             continue;
         }
 
-        // voice data: FROM:<user>|TO:<target>|<binary data>
-        size_t p1 = msg.find("FROM:");
-        size_t p2 = msg.find("|TO:");
-        size_t p3 = msg.find("|", p2 + 4);
+        const std::string dataMarker = "|DATA|";
 
-        if (p1 == std::string::npos || p2 == std::string::npos || p3 == std::string::npos)
+        std::string msgStr(buffer.data(), bytesReceived);
+
+        size_t markerPos = msgStr.find(dataMarker);
+        if (markerPos == std::string::npos) {
             continue;
+        }
 
-        std::string from = msg.substr(p1 + 5, p2 - (p1 + 5));
-        std::string to = msg.substr(p2 + 4, p3 - (p2 + 4));
+        std::string header = msgStr.substr(0, markerPos); 
+        size_t p1 = header.find("FROM:");
+        size_t p2 = header.find("|TO:");
+        if (p1 == std::string::npos || p2 == std::string::npos) {
+            continue;
+        }
+        std::string from = header.substr(p1 + 5, p2 - (p1 + 5));
+        std::string to = header.substr(p2 + 4); 
 
-        const char* audioData = buffer + p3 + 1;
-        int audioLen = bytesReceived - (p3 + 1);
+        int audioOffset = (int)(markerPos + dataMarker.length());
+        int audioLen = bytesReceived - audioOffset;
+        if (audioLen <= 0) continue;
+        const char* audioData = buffer.data() + audioOffset;
 
         forwardVoice(from, to, audioData, audioLen);
     }
@@ -104,19 +117,15 @@ void VoiceServer::registerClient(const std::string& username, const sockaddr_in&
     clients[username] = addr;
 }
 
-// 🚀 THÊM HÀM MỚI NÀY
 void VoiceServer::handleUnregister(const std::string& username) {
     std::lock_guard<std::mutex> lock(mtx);
 
-    // Xóa khỏi danh sách client UDP
     clients.erase(username);
 
-    // Kiểm tra xem họ có đang trong cuộc gọi không
     auto it = callPairs.find(username);
     if (it != callPairs.end()) {
         std::string partner = it->second;
         
-        // Xóa cả hai khỏi cặp gọi
         callPairs.erase(username);
         callPairs.erase(partner);
         
@@ -127,7 +136,6 @@ void VoiceServer::handleUnregister(const std::string& username) {
 }
 
 void VoiceServer::handleCallRequest(const std::string& msg) {
-    // CALL:<caller>|TO:<callee>
     size_t p1 = msg.find(":");
     size_t p2 = msg.find("|TO:");
     if (p1 == std::string::npos || p2 == std::string::npos) return;
@@ -139,9 +147,6 @@ void VoiceServer::handleCallRequest(const std::string& msg) {
     auto it = clients.find(callee);
     if (it == clients.end()) return;
 
-    /*std::string notify = "INCOMING_CALL:" + caller;
-    sendto(udpSocket, notify.c_str(), (int)notify.size(), 0,
-           (sockaddr*)&it->second, sizeof(it->second));*/
 
     std::string notify = "INCOMING_CALL:" + caller + "|TO:" + callee;
     sendto(udpSocket, notify.c_str(), (int)notify.size(), 0,
@@ -152,7 +157,6 @@ void VoiceServer::handleCallRequest(const std::string& msg) {
 }
 
 void VoiceServer::handleAcceptCall(const std::string& msg) {
-    // ACCEPT_CALL:<callee>|FROM:<caller>
     size_t p1 = msg.find(":");
     size_t p2 = msg.find("|FROM:");
     if (p1 == std::string::npos || p2 == std::string::npos) return;
@@ -168,7 +172,6 @@ void VoiceServer::handleAcceptCall(const std::string& msg) {
 
     auto it = clients.find(caller);
     if (it != clients.end()) {
-        //std::string notify = "CALL_ACCEPTED:" + callee;
         std::string notify = "CALL_ACCEPTED:" + callee + "|TO:" + caller;
         sendto(udpSocket, notify.c_str(), (int)notify.size(), 0,
                (sockaddr*)&it->second, sizeof(it->second));
@@ -178,7 +181,6 @@ void VoiceServer::handleAcceptCall(const std::string& msg) {
 }
 
 void VoiceServer::handleRejectCall(const std::string& msg) {
-    // REJECT_CALL:<callee>|FROM:<caller>
     size_t p1 = msg.find(":");
     size_t p2 = msg.find("|FROM:");
     if (p1 == std::string::npos || p2 == std::string::npos) return;
@@ -189,7 +191,6 @@ void VoiceServer::handleRejectCall(const std::string& msg) {
     std::lock_guard<std::mutex> lock(mtx);
     auto it = clients.find(caller);
     if (it != clients.end()) {
-        //std::string notify = "CALL_REJECTED:" + callee;
         std::string notify = "CALL_REJECTED:" + callee + "|TO:" + caller;
         sendto(udpSocket, notify.c_str(), (int)notify.size(), 0,
                (sockaddr*)&it->second, sizeof(it->second));
@@ -201,7 +202,6 @@ void VoiceServer::handleRejectCall(const std::string& msg) {
 void VoiceServer::forwardVoice(const std::string& from, const std::string& to, const char* data, int len) {
     std::lock_guard<std::mutex> lock(mtx);
 
-    // chỉ chuyển voice khi A và B đang trong cùng cuộc gọi
     auto it = callPairs.find(from);
     if (it == callPairs.end() || it->second != to)
         return;

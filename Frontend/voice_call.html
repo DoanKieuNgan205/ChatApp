@@ -13,32 +13,19 @@
     <button id="cancelBtn">❌ Hủy cuộc gọi</button>
   </div>
 
-  <script type="module">
-    import { connectToVoiceServer, callUser } from './voice.js';
+  <script>
 
     const params = new URLSearchParams(window.location.search);
-    const me = params.get('me');
+    
     const target = params.get('to');
     document.getElementById('targetUser').innerText = target;
 
-    connectToVoiceServer(me);
-
-    // Khi WebSocket kết nối xong, gửi lệnh gọi
-    setTimeout(() => {
-      callUser(target);
-    }, 1000);
-
-    // Khi Node gateway gửi tín hiệu "CALL_ACCEPTED", chuyển sang voice_listen.html
-    window.addEventListener("message", (e) => {
-      if (e.data === "CALL_ACCEPTED") {
-        window.location.href = `voice_listen.html?me=${me}&to=${target}`;
-      }
-    });
-
     document.getElementById('cancelBtn').onclick = () => {
-      alert("Bạn đã hủy cuộc gọi.");
-      window.location.href = "chat.html";
+      window.close(); 
     };
   </script>
+
+  <script src="voice.js"></script>
+
 </body>
 </html>

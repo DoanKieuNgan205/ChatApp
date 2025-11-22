@@ -1,44 +1,50 @@
-// voice.js - chạy trên trình duyệt
-
-let ws;                  // WebSocket tới Node.js
-let username = "";       // Tên user hiện tại
-let currentCall = null;  // Người đang gọi
+let ws;
+let username = "";
+let currentCall = null;
 let audioContext;
 let mediaStream;
 let sourceNode;
 let processor;
-let audioQueue = [];     // Hàng đợi dữ liệu audio đến
 
-// 🚀 LẤY THAM SỐ TỪ URL
+let nextAudioTime = 0;
+
 const urlParams = new URLSearchParams(window.location.search);
 const me = urlParams.get('me');
 const to = urlParams.get('to');
-const action = urlParams.get('action'); // 'call' hoặc 'accept'
+const action = urlParams.get('action');
 
 username = me;
 currentCall = to;
 
-// === Kết nối tới Voice Gateway ===
-function connectToVoiceServer(user) {
-    //username = user;
+
+function connectToVoiceServer() {
     ws = new WebSocket("ws://localhost:3000");
 
     ws.onopen = () => {
         console.log("✅ Kết nối Voice Gateway thành công");
-        ws.send(JSON.stringify({ action: "REGISTER", username: me }));
 
-        // 🚀 TỰ ĐỘNG GỌI HOẶC CHẤP NHẬN
+        if (!me || me === "null" || me.trim() === "") {
+            console.warn("🚫 Không đăng ký voice vì username null!");
+            ws.close();
+            return;
+        }
+        
+        ws.send(JSON.stringify({ action: "REGISTER_VOICE", username: me }));
+
         if (action === "call") {
             console.log(`Đang gọi ${to}...`);
-            callUser(to);
+           
+            setTimeout(() => callUser(to), 500);
         } else if (action === "accept") {
             console.log(`Chấp nhận cuộc gọi từ ${to}`);
-            // ❗ SỬA: Dùng "action"
+            
+            document.getElementById('callStatus').innerHTML = `🎧 Đang trong cuộc gọi với ${to}`;
             ws.send(JSON.stringify({ 
                 action: "ACCEPT_CALL", 
-                from: to, // người gọi
-                to: me    // tôi
+                from: to, 
+                to: me    
             }));
+            currentCall = to; 
             startAudio();
         }
     };
@@ -46,118 +52,154 @@ function connectToVoiceServer(user) {
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         switch (msg.action) {
-            /*case "INCOMING_CALL":
-                console.log(`📞 Cuộc gọi đến từ ${msg.from}`);
-                if (confirm(`${msg.from} đang gọi bạn. Chấp nhận không?`)) {
-                    ws.send(JSON.stringify({ type: "ACCEPT_CALL", from: msg.from, to: username }));
-                    startAudio();
-                } else {
-                    ws.send(JSON.stringify({ type: "REJECT_CALL", from: msg.from, to: username }));
-                }
-                break;*/
-
             case "CALL_ACCEPTED":
                 alert(`${msg.from} đã chấp nhận cuộc gọi!`);
+                document.getElementById('callStatus').innerHTML = `🎧 Đang trong cuộc gọi với ${to}`;
+                currentCall = msg.from; 
                 startAudio();
                 break;
-
             case "CALL_REJECTED":
                 alert(`${msg.from} từ chối cuộc gọi.`);
                 window.close();
                 break;
-
-            case "CALL_ENDED": // 🚀 THÊM MỚI
+            case "CALL_ENDED":
                 alert(`${msg.from} đã ngắt kết nối.`);
                 window.close();
                 break;
-
             case "AUDIO_DATA":
-                if (msg.from !== me) { // Chỉ phát audio của người khác
-                     playIncomingAudio(msg.data);
-                }
+                if (msg.from !== me) {
+                    if (Array.isArray(msg.data)) {
+                        playIncomingAudio(msg.data);
+                    } else {
+                        console.warn("⚠️ Bỏ qua gói AUDIO_DATA không hợp lệ:", msg);
+                    }
+                } 
                 break;
-
             default:
-                console.log("📩", msg);
+                console.log("📩 Popup msg:", msg);
         }
     };
 
-    ws.onclose = () => console.log("🔌 Mất kết nối Gateway");
+    ws.onclose = () => {
+        console.log("🔌 Mất kết nối Gateway");
+        stopAudio(); 
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+        }
+        if (audioContext) {
+            audioContext.close();
+        }
+    };
 }
 
-// === Gửi yêu cầu gọi ===
+
+
 function callUser(target) {
-    if (!ws) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.error("WebSocket chưa sẵn sàng để gọi!");
+        return;
+    }
     ws.send(JSON.stringify({ action: "CALL", from: username, to: target }));
 }
 
-// === Bắt đầu gửi âm thanh ===
+
+function stopAudio() {
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+    }
+    if (processor) {
+        processor.disconnect();
+        processor = null;
+    }
+    if (sourceNode) {
+        sourceNode.disconnect();
+        sourceNode = null;
+    }
+    
+}
+
 async function startAudio() {
     try {
-        if (!audioContext) {
-            audioContext = new AudioContext({ sampleRate: 44100 });
-        }
+        if (!audioContext) audioContext = new AudioContext({ sampleRate: 44100 });
+        
+        nextAudioTime = audioContext.currentTime;
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         sourceNode = audioContext.createMediaStreamSource(mediaStream);
-        processor = audioContext.createScriptProcessor(4096, 1, 1);
+        processor = audioContext.createScriptProcessor(2048, 1, 1);
+    
+        const gainNode = audioContext.createGain();
+        
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
 
+        
         sourceNode.connect(processor);
-        processor.connect(audioContext.destination);
+        
+        processor.connect(gainNode);
+        
+        gainNode.connect(audioContext.destination);
 
         processor.onaudioprocess = (e) => {
             const input = e.inputBuffer.getChannelData(0);
-            
-            // Chuyển đổi sang 16-bit PCM
-            const buffer = new Int16Array(input.length);
+            const buf = new Int16Array(input.length);
             for (let i = 0; i < input.length; i++) {
-                buffer[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
+                let s = Math.max(-1, Math.min(1, input[i]));
+                buf[i] = s < 0 ? s * 0x8000 : s * 0x7FFF; 
             }
-            
-            // Chuyển đổi mảng Int16Array (2 bytes mỗi phần tử) thành mảng Uint8Array (1 byte mỗi phần tử)
-            const audioData = Array.from(new Uint8Array(buffer.buffer));
+            const audioData = Array.from(new Uint8Array(buf.buffer));
 
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     action: "AUDIO_DATA",
                     from: username,
                     to: currentCall,
-                    data: audioData // data là một mảng các số (byte)
+                    data: audioData
                 }));
             }
+
         };
+
     } catch (err) {
         console.error("Lỗi khi bật audio:", err);
-        alert("Không thể truy cập micro. Vui lòng cấp quyền.");
+        alert("Lỗi khi bật audio: " + err.message);
     }
 }
 
-// === Phát âm thanh nhận được ===
+
 function playIncomingAudio(dataArray) {
     try {
-        if (!audioContext) {
-            audioContext = new AudioContext({ sampleRate: 44100 });
-        }
+        if (!audioContext) audioContext = new AudioContext({ sampleRate: 44100 });
+        if (!Array.isArray(dataArray) || dataArray.length === 0) return;
 
-        // Chuyển mảng byte (Uint8Array) về mảng 16-bit (Int16Array)
-        const int16Buffer = new Int16Array(new Uint8Array(dataArray).buffer);
         
-        const audioBuffer = audioContext.createBuffer(1, int16Buffer.length, audioContext.sampleRate);
+        const u8 = new Uint8Array(dataArray);
+        const int16 = new Int16Array(u8.buffer);
+
+        
+        const sampleRate = audioContext.sampleRate;
+        
+        const audioBuffer = audioContext.createBuffer(1, int16.length, sampleRate);
         const channel = audioBuffer.getChannelData(0);
+
         
-        // Chuyển đổi 16-bit PCM về float (-1.0 đến 1.0)
-        for (let i = 0; i < int16Buffer.length; i++) {
-            channel[i] = int16Buffer[i] / 0x7FFF;
+        for (let i = 0; i < int16.length; i++) {
+            channel[i] = int16[i] / 32768;
         }
 
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-        source.start();
-    } catch (err)
-    {
-        console.error("Lỗi phát audio:", err);
+        const src = audioContext.createBufferSource();
+        src.buffer = audioBuffer;
+        src.connect(audioContext.destination);
+
+        let currentTime = audioContext.currentTime;
+        if (nextAudioTime < currentTime) {
+            nextAudioTime = currentTime;
+        }
+        src.start(nextAudioTime);
+        nextAudioTime += audioBuffer.duration;
+
+    } catch (err) {
+        console.error("❌ Lỗi phát audio:", err);
     }
 }
 
-// 🚀 TỰ ĐỘNG KẾT NỐI KHI TRANG ĐƯỢC MỞ
 connectToVoiceServer();
