@@ -1,50 +1,159 @@
+* {
+  padding: 0;
+  border: none;
+  margin: 0;
+  box-sizing: border-box;
+}
+
 body {
-  font-family: Arial, sans-serif;
-  background: linear-gradient(135deg, #4e73df, #1cc88a);
+  font-family: "Montserrat", sans-serif;
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.split-container {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+}
+
+/* Phần bên trái - Form đăng nhập */
+.left-section {
+  flex: 1;
+  background: white;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  margin: 0;
+  padding: 40px;
 }
 
-.login-container {
-  background: white;
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-  width: 320px;
+.login-content {
+  width: 100%;
+  max-width: 400px;
   text-align: center;
 }
 
-.login-container h2 {
-  color: #333;
-  margin-bottom: 20px;
+.login-content h2 {
+  color: #0c5776;
+  margin-bottom: 30px;
+  font-size: 28px;
+  font-weight: 600;
 }
 
-input {
-  width: 90%;
-  padding: 10px;
-  margin: 8px 0;
-  border-radius: 6px;
-  border: 1px solid #ccc;
+.login-content input {
+  width: 100%;
+  padding: 15px;
+  margin: 12px 0;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  transition: all 0.3s ease;
 }
 
-button {
-  width: 95%;
-  padding: 10px;
-  background-color: #4e73df;
+.login-content input:focus {
+  outline: none;
+  border-color: #4e73df;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.1);
+  transform: translateY(-2px);
+}
+.login-content input::placeholder{
+  color: #a0a0a0;
+}
+
+.login-content button {
+  width: 100%;
+  padding: 15px;
+  background-color: #2d99ae;
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 10px;
+  transition: all 0.3s ease;
 }
 
-button:hover {
-  background-color: #375acb;
+.login-content button:hover {
+  background-color: #1a6d7c;
+  transform: translateY(-3px);
+}
+
+/* Phần bên phải - Logo */
+.right-section {
+  flex: 1;
+  background: #0c5776; 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  border-top-left-radius: 25px;    
+  border-bottom-left-radius: 25px;
+}
+
+.logo-content {
+  text-align: center;
+  width: 100%;
+}
+
+.logo-content lottie-player {
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+}
+
+/* Link đăng ký */
+.register-link {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 14px;
+  color: #0c5776;
+}
+
+.register-link a {
+  color: #f1ce05;
+  text-decoration: none;
+  font-weight: bold;
+  cursor: pointer;
 }
 
 #status {
   margin-top: 10px;
-  color: red;
+  color: #ff6b6b;
+}
+
+/* Responsive cho mobile */
+@media (max-width: 768px) {
+  .split-container {
+    flex-direction: column;
+  }
+  
+  .left-section, .right-section {
+    flex: none;
+    height: 50vh;
+  }
+  
+  .logo-content lottie-player {
+    max-width: 300px;
+  }
+}
+/* Animation khi load */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.login-content {
+  animation: fadeInUp 0.9s ease-out;
+}
+.login-content input {
+  animation: fadeInUp 0.9s ease-out backwards;
 }

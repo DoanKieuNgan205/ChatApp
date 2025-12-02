@@ -3,18 +3,41 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Đăng nhập ChatApp</title>
-  <link rel="stylesheet" href="chat.css" />
+  <title>ChatApp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&family=Open+Sans:wght@300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 </head>
 <body>
-  <div class="login-container">
-    <h2>Đăng nhập ChatApp</h2>
-    <form id="loginForm">
-      <input type="text" id="username" placeholder="Tên đăng nhập" required />
-      <input type="password" id="password" placeholder="Mật khẩu" required />
-      <button type="submit">Đăng nhập</button>
-    </form>
-    <p id="status"></p>
+  <div class="split-container">
+    <div class="left-section">
+      <div class="login-content">
+        <h2>Đăng nhập</h2>
+        <form id="loginForm">
+          <input type="text" id="username" placeholder="Tên đăng nhập" required />
+          <input type="password" id="password" placeholder="Mật khẩu" required />
+          <button type="submit">Đăng nhập</button>
+        </form>
+        <div class="register-link">
+          Chưa có tài khoản? <a href="register.html" id="registerLink">Tạo tài khoản ngay</a>
+        </div>
+        <p id="status"></p>
+      </div>
+    </div>
+    <div class="right-section">
+      <div class="logo-content">
+        <lottie-player 
+          src="logos/logo.json"  
+          background="transparent"
+          speed="1"
+          loop
+          autoplay>
+        </lottie-player>
+      </div>
+    </div>
   </div>
 
 <script>

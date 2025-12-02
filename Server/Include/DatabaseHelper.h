@@ -35,6 +35,12 @@ public:
     bool saveCallHistory(const std::string& caller, const std::string& receiver, const std::string& status);
     std::vector<std::string> getFileHistory(const std::string& username);
     std::vector<std::string> getCallHistory(const std::string& username);
+
+    std::vector<std::string> getPrivateChatHistory(const std::string& user1, const std::string& user2);
+
+    std::vector<std::string> getPrivateFileHistory(const std::string& user1, const std::string& user2);
+
+    std::vector<std::string> getPrivateCallHistory(const std::string& user1, const std::string& user2);
 };
 
 #endif

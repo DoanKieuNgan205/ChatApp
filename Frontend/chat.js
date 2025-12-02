@@ -35,10 +35,10 @@ ws.addEventListener("open", () => {
 
   setTimeout(() => ws.send(JSON.stringify({ action: "list" })), 200);
 
-  ws.send(JSON.stringify({
+  /*ws.send(JSON.stringify({
     action: "get_history",
     username: username
-  }));
+  }));*/
 });
 
 ws.addEventListener("close", () => {
@@ -88,7 +88,7 @@ ws.addEventListener("message", (event) => {
 
     case "history_response":
     
-      messages.innerHTML = "";
+      /*messages.innerHTML = "";
 
       if (!messageHistory[username]) messageHistory[username] = [];
 
@@ -111,6 +111,48 @@ ws.addEventListener("message", (event) => {
       });
 
       if (currentChatUser) renderHistory(currentChatUser);
+      break;*/
+
+      // Phản hồi lịch sử chỉ dành cho cặp chat hiện tại
+      const historyUser = data.username || data.to;
+
+      if (historyUser && historyUser === currentChatUser) {
+          // Xóa lịch sử cũ cho cặp chat này và thay thế bằng lịch sử mới
+          messageHistory[historyUser] = [];
+
+          (data.chatHistory || []).forEach(msg => {
+              messageHistory[historyUser].push({ 
+                  type: "text", 
+                  from: msg.from, 
+                  text: msg.message 
+              });
+          });
+
+          (data.fileHistory || []).forEach(f => {
+              messageHistory[historyUser].push({ 
+                  type: "file", 
+                  from: f.from, 
+                  filename: f.filename, 
+                  url: `http://localhost:3001${f.path}` 
+              });
+          });
+
+          (data.callHistory || []).forEach(c => {
+              messageHistory[historyUser].push({ 
+                  type: "call", 
+                  from: c.from, 
+                  status: c.status 
+              });
+          });
+
+          // Chỉ render lịch sử của người dùng đang chat hiện tại
+          if (currentChatUser) renderHistory(currentChatUser);
+
+      } else if (data.username && !data.to) {
+          // Đây là phản hồi lịch sử tổng (nếu vẫn cần)
+          // Giữ lại logic phân chia lịch sử đã có
+          // ... (Bạn có thể bỏ qua phần này nếu C++ chỉ gửi lịch sử riêng tư)
+      }
       break;
 
     case "INCOMING_CALL":
@@ -231,11 +273,24 @@ function renderUserList(users) {
       const div = document.createElement("div");
       div.className = "user-item";
       div.textContent = u;
-      div.onclick = () => {                     
+      /*div.onclick = () => {                     
         currentChatUser = u;
         chatWith.textContent = "💬 Đang chat với: " + u;
         renderHistory(u); 
-      };
+      };*/
+
+      div.onclick = () => {
+        currentChatUser = u;
+        chatWith.textContent = "💬 Đang chat với: " + u;
+  
+        messages.innerHTML = `<div style="text-align:center; color:#999; padding:20px;">Đang tải lịch sử với ${u}...</div>`;
+        ws.send(JSON.stringify({ 
+          action: "get_history", 
+          from: username,
+          to: u 
+        }));
+        // renderHistory(u); 
+      }
       userList.appendChild(div);
     }
   });
