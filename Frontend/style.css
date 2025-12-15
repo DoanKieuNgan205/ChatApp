@@ -18,7 +18,6 @@ body {
   width: 100%;
 }
 
-/* Phần bên trái - Form đăng nhập */
 .left-section {
   flex: 1;
   background: white;
@@ -82,7 +81,6 @@ body {
   transform: translateY(-3px);
 }
 
-/* Phần bên phải - Logo */
 .right-section {
   flex: 1;
   background: #0c5776; 
@@ -105,7 +103,6 @@ body {
   height: auto;
 }
 
-/* Link đăng ký */
 .register-link {
   margin-top: 20px;
   text-align: center;
@@ -125,7 +122,6 @@ body {
   color: #ff6b6b;
 }
 
-/* Responsive cho mobile */
 @media (max-width: 768px) {
   .split-container {
     flex-direction: column;
@@ -140,7 +136,7 @@ body {
     max-width: 300px;
   }
 }
-/* Animation khi load */
+
 @keyframes fadeInUp {
   from {
     opacity: 0;

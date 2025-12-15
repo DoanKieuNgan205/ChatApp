@@ -5,6 +5,9 @@ let audioContext;
 let mediaStream;
 let sourceNode;
 let processor;
+let callStartTime = null;
+let callTimerInterval = null;
+
 
 let nextAudioTime = 0;
 
@@ -18,7 +21,7 @@ currentCall = to;
 
 
 function connectToVoiceServer() {
-    ws = new WebSocket("ws://localhost:3000");
+    ws = new WebSocket("wss://10.10.49.115:3000");
 
     ws.onopen = () => {
         console.log("✅ Kết nối Voice Gateway thành công");
@@ -46,6 +49,7 @@ function connectToVoiceServer() {
             }));
             currentCall = to; 
             startAudio();
+            startCallTimer(); 
         }
     };
 
@@ -57,6 +61,7 @@ function connectToVoiceServer() {
                 document.getElementById('callStatus').innerHTML = `🎧 Đang trong cuộc gọi với ${to}`;
                 currentCall = msg.from; 
                 startAudio();
+                startCallTimer();
                 break;
             case "CALL_REJECTED":
                 alert(`${msg.from} từ chối cuộc gọi.`);
@@ -64,6 +69,7 @@ function connectToVoiceServer() {
                 break;
             case "CALL_ENDED":
                 alert(`${msg.from} đã ngắt kết nối.`);
+                stopCallTimer(); 
                 window.close();
                 break;
             case "AUDIO_DATA":
@@ -82,6 +88,7 @@ function connectToVoiceServer() {
 
     ws.onclose = () => {
         console.log("🔌 Mất kết nối Gateway");
+        stopCallTimer();
         stopAudio(); 
         if (mediaStream) {
             mediaStream.getTracks().forEach(track => track.stop());
@@ -201,5 +208,34 @@ function playIncomingAudio(dataArray) {
         console.error("❌ Lỗi phát audio:", err);
     }
 }
+
+function formatTime(seconds) {
+    const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+    const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+    const s = String(seconds % 60).padStart(2, '0');
+    return `${h}:${m}:${s}`;
+}
+
+function startCallTimer() {
+    if (callTimerInterval) return;
+
+    callStartTime = Date.now();
+    callTimerInterval = setInterval(() => {
+        const elapsed =
+            Math.floor((Date.now() - callStartTime) / 1000);
+
+        const timer = document.getElementById("callTimer");
+        if (timer) timer.innerText = formatTime(elapsed);
+    }, 1000);
+}
+
+function stopCallTimer() {
+    clearInterval(callTimerInterval);
+    callTimerInterval = null;
+
+    const timer = document.getElementById("callTimer");
+    if (timer) timer.innerText = "00:00:00";
+}
+
 
 connectToVoiceServer();

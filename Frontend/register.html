@@ -28,7 +28,7 @@
 <script>
 (() => {
   const statusEl = document.getElementById('status');
-  const ws = new WebSocket('ws://localhost:3000'); 
+  const ws = new WebSocket('wss://10.10.49.115:3000'); 
 
   ws.addEventListener('open', () => {
     console.log('[Frontend] Connected to gateway');
@@ -58,7 +58,7 @@
 
   ws.addEventListener('error', () => {
     statusEl.style.color = 'red';
-    statusEl.textContent = 'Không kết nối được gateway (ws://localhost:3000)';
+    statusEl.textContent = 'Không kết nối được gateway (wss://10.10.49.115:3000)';
   });
 
   document.getElementById('registerForm').addEventListener('submit', (evt) => {

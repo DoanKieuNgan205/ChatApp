@@ -1,4 +1,3 @@
-/* chat.css - giao diện cơ bản tương tự mẫu */
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -7,7 +6,6 @@ body {
   background: linear-gradient(135deg,#f0f4ff,#f7fff5);
 }
 
-/* layout */
 .app {
   display: flex;
   height: 100vh;
@@ -16,7 +14,6 @@ body {
   align-items: stretch;
 }
 
-/* sidebar */
 .sidebar {
   width: 320px;
   background: linear-gradient(180deg,#6f5ce8,#9d7bff);
@@ -54,7 +51,6 @@ body {
   font-size: 14px;
 }
 
-/* list */
 .user-list {
   overflow-y: auto;
   padding-top: 6px;
@@ -76,7 +72,6 @@ body {
 .user-item .name { font-weight:600; }
 .user-item small { opacity:0.9; font-size:12px; }
 
-/* chat panel */
 .chat-panel {
   flex:1;
   display:flex;
@@ -105,7 +100,6 @@ body {
   background: #f5f6f8;
 }
 
-/* Tin nhắn chung */
 .message {
   display: flex;
   align-items: flex-end;
@@ -113,7 +107,6 @@ body {
   animation: fadeIn 0.3s ease-in-out;
 }
 
-/* Hiệu ứng trượt nhẹ khi xuất hiện */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -125,7 +118,6 @@ body {
   }
 }
 
-/* Bong bóng tin nhắn */
 .bubble {
   max-width: 70%;
   padding: 10px 14px;
@@ -136,7 +128,6 @@ body {
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
-/* Tin người khác (trái) */
 .message.left {
   justify-content: flex-start;
 }
@@ -147,7 +138,6 @@ body {
   border-top-left-radius: 0;
 }
 
-/* Tin của tôi (phải) */
 .message.right {
   justify-content: flex-end;
 }
@@ -158,7 +148,6 @@ body {
   border-top-right-radius: 0;
 }
 
-/* Avatar nhỏ */
 .avatar {
   width: 32px;
   height: 32px;
@@ -172,8 +161,6 @@ body {
   flex-shrink: 0;
 }
 
-
-/* composer */
 .composer {
   display:flex;
   gap: 8px;
@@ -196,7 +183,6 @@ body {
   cursor: pointer;
 }
 
-/* responsive */
 @media (max-width: 900px) {
   .app { padding: 12px; gap: 8px; }
   .sidebar { display:none; }
@@ -241,4 +227,51 @@ body {
 }
 .user-item:hover {
   background: #e6f7ff;
+}
+
+.profile-dropdown-container {
+    position: relative; 
+}
+
+#profile-trigger {
+    cursor: pointer; 
+}
+
+.dropdown-menu {
+    display: none; 
+    position: absolute; 
+    top: 100%; 
+    left: 0; 
+    width: 250px; 
+    background-color: #ffffff; 
+    border: 1px solid #ddd;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 100; 
+    border-radius: 4px;
+    margin-top: 5px; 
+}
+
+
+.dropdown-menu.show {
+    display: block; 
+}
+
+.menu-item {
+    display: block;
+    padding: 12px 15px;
+    text-decoration: none;
+    color: #333;
+    transition: background-color 0.2s;
+    font-size: 14px;
+}
+
+.menu-item:hover {
+    background-color: #f0f0f0;
+}
+
+
+.menu-item.logout {
+    color: #f44336; 
+    font-weight: bold;
+    border-top: 1px solid #eee;
 }

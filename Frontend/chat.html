@@ -60,13 +60,29 @@
 <body>
   <div class="app">
     <aside class="sidebar">
-      <div class="profile">
+      <!--<div class="profile">
+        <div class="avatar">👤</div>
+        <div class="meta">
+          <div id="me-username">User</div>
+          <small id="me-status">Online</small>
+        </div>
+      </div>-->
+
+      <div class="profile-dropdown-container"> 
+        <div class="profile" id="profile-trigger"> 
         <div class="avatar">👤</div>
         <div class="meta">
           <div id="me-username">User</div>
           <small id="me-status">Online</small>
         </div>
       </div>
+    
+    <div class="dropdown-menu" id="profile-menu">
+        <a href="#" class="menu-item">Thông tin cá nhân</a>
+        <a href="#" class="menu-item">Đổi mật khẩu</a>
+        <a href="#" class="menu-item logout" id="logout-button">Đăng xuất</a> 
+    </div>
+</div>
 
       <div class="search">
         <input type="text" id="searchUser" placeholder="Tìm kiếm người dùng..." />

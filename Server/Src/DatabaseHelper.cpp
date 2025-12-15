@@ -459,7 +459,7 @@ std::vector<std::string> DatabaseHelper::getCallHistory(const std::string& usern
 
 
 
-std::vector<std::string> DatabaseHelper::getPrivateChatHistory(
+/*std::vector<std::string> DatabaseHelper::getPrivateChatHistory(
     const std::string& user1, const std::string& user2)
 {
     std::vector<std::string> history;
@@ -538,6 +538,101 @@ std::vector<std::string> DatabaseHelper::getPrivateChatHistory(
         // Format giống 100% kiểu bạn đang dùng cho File + Call
         std::string record = "[Chat] " +
             std::string((char*)sender) + " " + arrow + " " + std::string((char*)receiver) + ": ";
+
+        if (strlen((char*)filename) > 0)
+            record += "(File: " + std::string((char*)filename) + ")";
+        else if (strlen((char*)message) > 0)
+            record += std::string((char*)message);
+        else
+            record += "(Tin nhắn trống)";
+
+        record += " [" + std::string((char*)sentTime) + "]";
+
+        history.push_back(record);
+    }
+
+    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+    return history;
+}*/
+
+std::vector<std::string> DatabaseHelper::getPrivateChatHistory(
+    const std::string& user1, const std::string& user2)
+{
+    std::vector<std::string> history;
+    if (!connected) return history;
+
+    SQLHSTMT stmt;
+    SQLAllocHandle(SQL_HANDLE_STMT, hDbc, &stmt);
+
+    std::string query =
+        "SELECT Sender, Receiver, Message, FileName, "
+        "CONVERT(VARCHAR, SentAt, 120) AS SentTime "
+        "FROM ChatHistory "
+        "WHERE (Sender = ? AND Receiver = ?) OR (Sender = ? AND Receiver = ?) "
+        "ORDER BY SentAt ASC";
+
+    SQLRETURN ret = SQLPrepareA(stmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+    if (!SQL_SUCCEEDED(ret)) {
+        std::cerr << "[DB] ❌ Lỗi prepare lấy PrivateChatHistory\n";
+        printSQLError(SQL_HANDLE_STMT, stmt);
+        SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+        return history;
+    }
+
+    SQLLEN lenUser1 = (SQLLEN)user1.size();
+    SQLLEN lenUser2 = (SQLLEN)user2.size();
+    SQLUINTEGER userColSize = 50;
+
+    SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR,
+                     userColSize, 0, (SQLPOINTER)user1.c_str(), 0, &lenUser1);
+
+    SQLBindParameter(stmt, 2, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR,
+                     userColSize, 0, (SQLPOINTER)user2.c_str(), 0, &lenUser2);
+
+    SQLBindParameter(stmt, 3, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR,
+                     userColSize, 0, (SQLPOINTER)user2.c_str(), 0, &lenUser2);
+
+    SQLBindParameter(stmt, 4, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR,
+                     userColSize, 0, (SQLPOINTER)user1.c_str(), 0, &lenUser1);
+
+    ret = SQLExecute(stmt);
+    if (!SQL_SUCCEEDED(ret)) {
+        std::cerr << "[DB] ❌ Lỗi thực thi lấy PrivateChatHistory\n";
+        printSQLError(SQL_HANDLE_STMT, stmt);
+        SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+        return history;
+    }
+
+    SQLCHAR sender[50], receiver[50];
+    SQLCHAR message[2000], filename[255], sentTime[30];
+    SQLLEN indicator = 0;
+
+    while (SQLFetch(stmt) == SQL_SUCCESS)
+    {
+        memset(sender, 0, sizeof(sender));
+        memset(receiver, 0, sizeof(receiver));
+        memset(message, 0, sizeof(message));
+        memset(filename, 0, sizeof(filename));
+        memset(sentTime, 0, sizeof(sentTime));
+
+        SQLGetData(stmt, 1, SQL_C_CHAR, sender, sizeof(sender), NULL);
+        SQLGetData(stmt, 2, SQL_C_CHAR, receiver, sizeof(receiver), NULL);
+
+        // Message có thể NULL
+        SQLGetData(stmt, 3, SQL_C_CHAR, message, sizeof(message), &indicator);
+        if (indicator == SQL_NULL_DATA) message[0] = '\0';
+
+        // FileName có thể NULL
+        SQLGetData(stmt, 4, SQL_C_CHAR, filename, sizeof(filename), &indicator);
+        if (indicator == SQL_NULL_DATA) filename[0] = '\0';
+
+        SQLGetData(stmt, 5, SQL_C_CHAR, sentTime, sizeof(sentTime), NULL);
+
+        // ✅ QUAN TRỌNG: LUÔN DÙNG -> (không dùng <-)
+        // Frontend sẽ tự xác định hiển thị trái/phải dựa vào sender
+        std::string record = "[Chat] " +
+            std::string((char*)sender) + " -> " + 
+            std::string((char*)receiver) + ": ";
 
         if (strlen((char*)filename) > 0)
             record += "(File: " + std::string((char*)filename) + ")";

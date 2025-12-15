@@ -9,6 +9,9 @@
 <body>
   <div class="voice-container">
     <h2 id="callStatus">📞 Đang gọi tới <span id="targetUser"></span>...</h2>
+     <div id="callTimer" style="margin: 8px 0; font-size: 20px; font-weight: bold;">
+      00:00:00
+    </div>
     <div class="avatar">👤</div>
     <button id="cancelBtn">❌ Hủy cuộc gọi</button>
   </div>
@@ -21,6 +24,7 @@
     document.getElementById('targetUser').innerText = target;
 
     document.getElementById('cancelBtn').onclick = () => {
+      stopCallTimer();
       window.close(); 
     };
   </script>

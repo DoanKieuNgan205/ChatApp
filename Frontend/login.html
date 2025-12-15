@@ -48,7 +48,7 @@
   let ws = null;
 
   function connectWS(callback) {
-    ws = new WebSocket('ws://localhost:3000');
+    ws = new WebSocket('wss://10.10.49.115:3000');
 
     ws.addEventListener('open', () => {
       console.log('[Frontend] ✅ WS connected to gateway');
@@ -76,12 +76,12 @@
     });
 
     ws.addEventListener('close', () => {
-      console.warn('[Frontend] ⚠️ WS connection closed');
+      console.warn('[Frontend] ⚠️ WSS connection closed');
     });
 
     ws.addEventListener('error', (e) => {
       statusEl.style.color = 'red';
-      statusEl.textContent = 'Không kết nối được gateway (ws://localhost:3000)';
+      statusEl.textContent = 'Không kết nối được gateway (wss://10.10.49.115:3000)';
       console.error(e);
     });
   }

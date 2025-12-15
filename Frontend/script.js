@@ -8,7 +8,7 @@ document.getElementById("loginForm").addEventListener("submit", (e) => {
   const status = document.getElementById("status");
 
   if (!socket || socket.readyState !== WebSocket.OPEN) {
-    socket = new WebSocket("ws://localhost:3000"); // kết nối gateway
+    socket = new WebSocket("wss://10.10.49.115:3000"); 
 
     socket.onopen = () => {
       console.log("Đã kết nối tới Gateway");
@@ -39,7 +39,6 @@ document.getElementById("loginForm").addEventListener("submit", (e) => {
 });
 
 
-// Khi nhấn nút đăng xuất
 document.getElementById("logoutBtn").addEventListener("click", () => {
   if (socket && currentUser) {
     const logoutMsg = {
@@ -49,7 +48,6 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
     socket.send(JSON.stringify(logoutMsg));
   }
 
-  // Xóa session và quay lại màn hình đăng nhập
   currentUser = null;
   document.getElementById("chatContainer").style.display = "none";
   document.getElementById("loginContainer").style.display = "block";

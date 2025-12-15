@@ -13,8 +13,6 @@
 #include <algorithm> 
 #include <thread>    
 
-
-
 using namespace std;
 
 extern DatabaseHelper db; 
@@ -24,7 +22,6 @@ vector<SOCKET> clients;
 mutex mtx;
 FileServer fileServer;     
 VoiceServer voiceServer;   
-
 
 string parseField(const string& json, const string& field) {
     size_t pos = json.find("\"" + field + "\"");
@@ -145,45 +142,8 @@ void handleClient(SOCKET client) {
         cout << "[INFO] User login: " << username << endl;
         cout << "[INFO] ========== ENTERING MESSAGE LOOP ==========" << endl;
 
-        /*vector<string> chatHistory = db.getChatHistory(username);
-        vector<string> fileHistory = db.getFileHistory(username);
-        vector<string> callHistory = db.getCallHistory(username);
-
-        
-        auto escape = [](string s) {
-            string r = "";
-            for (char c : s) {
-                if (c == '\"') r += "\\\"";
-                else r += c;
-            }
-            return r;
-        };
-
-        string json = "{ \"action\": \"history_response\", \"username\": \"" + username + "\", \"chatHistory\": [";
-        for (int i = 0; i < chatHistory.size(); i++) {
-            json += "\"" + escape(chatHistory[i]) + "\"";
-            if (i < chatHistory.size()-1) json += ",";
-        }
-
-        json += "], \"fileHistory\": [";
-
-        for (int i = 0; i < fileHistory.size(); i++) {
-            json += "\"" + escape(fileHistory[i]) + "\"";
-            if (i < fileHistory.size()-1) json += ",";
-        }
-
-        json += "], \"callHistory\": [";
-
-        for (int i = 0; i < callHistory.size(); i++) {
-            json += "\"" + escape(callHistory[i]) + "\"";
-            if (i < callHistory.size()-1) json += ",";
-        }
-
-        json += "] }\n";
-
-        send(client, json.c_str(), (int)json.size(), 0);*/
      
-        while (true) {
+        /*while (true) {
             bytes = recv(client, buf, sizeof(buf)-1, 0);
             if (bytes <= 0) {
                 cout << "[INFO] Connection closed or error, bytes=" << bytes << endl;
@@ -330,6 +290,99 @@ void handleClient(SOCKET client) {
                 continue;
             }
 
+            // Thêm vào trong message loop (sau phần xử lý "save_private_message")
+
+            else if (action == "save_file") {
+                string from = parseField(msg, "from");
+                string to = parseField(msg, "to");
+                string filename = parseField(msg, "filename");
+                
+                if (!from.empty() && !to.empty() && !filename.empty()) {
+                    db.saveFileHistory(from, to, filename);
+                    cout << "[DB] ✅ Saved file history: " << from << " -> " << to << ": " << filename << endl;
+                    
+                    // Gửi xác nhận (optional)
+                    string ack = R"({ "action": "file_saved", "status": "success" })" "\n";
+                    send(client, ack.c_str(), (int)ack.size(), 0);
+                } else {
+                    cout << "[WARN] save_file: Thiếu thông tin from/to/filename" << endl;
+                }
+                
+                continue;
+            }
+
+            // ===== SỬA PHẦN get_history =====
+            else if (action == "get_history") {
+                string user1 = parseField(msg, "user1");
+                string user2 = parseField(msg, "user2");
+                
+                cout << "[INFO] Gateway yêu cầu lịch sử: " << user1 << " <-> " << user2 << endl;
+                
+                if (user1.empty() || user2.empty()) {
+                    string err = R"({ "action": "error", "message": "user1 hoặc user2 trống" })";
+                    send(client, err.c_str(), (int)err.size(), 0);
+                    continue;
+                }
+
+                // Lấy lịch sử từ database
+                vector<string> chatHistory = db.getPrivateChatHistory(user1, user2); 
+                vector<string> fileHistory = db.getPrivateFileHistory(user1, user2); 
+                vector<string> callHistory = db.getPrivateCallHistory(user1, user2); 
+
+                cout << "[DB] Loaded: " << chatHistory.size() << " chats, "
+                    << fileHistory.size() << " files, " 
+                    << callHistory.size() << " calls" << endl;
+
+                // ✅ ESCAPE FUNCTION - Đảm bảo JSON hợp lệ
+                auto escape = [](string s) {
+                    string r = "";
+                    for (char c : s) {
+                        if (c == '\"') r += "\\\"";
+                        else if (c == '\\') r += "\\\\";
+                        else if (c == '\n') r += "\\n";
+                        else if (c == '\r') r += "\\r";
+                        else if (c == '\t') r += "\\t";
+                        else r += c;
+                    }
+                    return r;
+                };
+
+                // ✅ TẠO JSON RESPONSE
+                string json = "{ \"action\": \"history_response\", \"user1\": \"" + user1 + 
+                            "\", \"user2\": \"" + user2 + "\", \"chatHistory\": [";
+
+                for (size_t i = 0; i < chatHistory.size(); i++) {
+                    json += "\"" + escape(chatHistory[i]) + "\"";
+                    if (i < chatHistory.size()-1) json += ",";
+                }
+
+                json += "], \"fileHistory\": [";
+                for (size_t i = 0; i < fileHistory.size(); i++) {
+                    json += "\"" + escape(fileHistory[i]) + "\"";
+                    if (i < fileHistory.size()-1) json += ",";
+                }
+
+                json += "], \"callHistory\": [";
+                for (size_t i = 0; i < callHistory.size(); i++) {
+                    json += "\"" + escape(callHistory[i]) + "\"";
+                    if (i < callHistory.size()-1) json += ",";
+                }
+                json += "] }\n";
+                
+                // ✅ DEBUG: In ra JSON để kiểm tra
+                cout << "[DEBUG] JSON Response (first 500 chars):\n" << json.substr(0, 500) << endl;
+                
+                cout << "[INFO] Sending response (" << json.length() << " bytes)" << endl;
+                int sent = send(client, json.c_str(), (int)json.size(), 0);
+                if (sent == SOCKET_ERROR) {
+                    cout << "[ERROR] Send failed: " << WSAGetLastError() << endl;
+                } else {
+                    cout << "[INFO] ✅ Sent " << sent << " bytes successfully" << endl;
+                }
+                
+                continue;
+            }
+
             else if (action == "list") {
                 string list = "{ \"action\": \"online_list\", \"users\": [";
                 {
@@ -417,6 +470,219 @@ void handleClient(SOCKET client) {
                 cout << "[VOICE] Cuộc gọi voice từ " << from << " đến " << to << endl;
                 db.saveCallHistory(from, to, "started");
 
+                continue;
+            }
+            
+            else { 
+                string message = parseField(msg, "message");
+                if (!username.empty() && !message.empty()) {
+                    string chatMsg = username + ": " + message;
+                    cout << chatMsg << endl;
+                    broadcast(chatMsg, client);
+                    db.saveMessage(username, "ALL", message); 
+                }
+            }
+        }*/
+
+        // ===== PHẦN MESSAGE LOOP - CHỈ GIỮ LẠI 1 HANDLER CHO MỖI ACTION =====
+
+        while (true) {
+            bytes = recv(client, buf, sizeof(buf)-1, 0);
+            if (bytes <= 0) {
+                cout << "[INFO] Connection closed or error, bytes=" << bytes << endl;
+                break;
+            }
+            
+            buf[bytes] = '\0';
+            string msg(buf);
+
+            cout << "\n[DEBUG] ========================================" << endl;
+            cout << "[DEBUG] Received message from " << username << endl;
+            cout << "[DEBUG] Message length: " << bytes << " bytes" << endl;
+            cout << "[DEBUG] Raw message: " << msg << endl;
+            cout << "[DEBUG] ========================================\n" << endl;
+
+            string action = parseField(msg, "action");
+            cout << "[DEBUG] Parsed action: '" << action << "'" << endl;
+
+            if (action == "get_history") {
+                string user1 = parseField(msg, "user1");
+                string user2 = parseField(msg, "user2");
+                
+                cout << "[INFO] Gateway yêu cầu lịch sử: " << user1 << " <-> " << user2 << endl;
+                
+                if (user1.empty() || user2.empty()) {
+                    string err = R"({ "action": "error", "message": "user1 hoặc user2 trống" })";
+                    send(client, err.c_str(), (int)err.size(), 0);
+                    continue;
+                }
+
+                vector<string> chatHistory = db.getPrivateChatHistory(user1, user2); 
+                vector<string> fileHistory = db.getPrivateFileHistory(user1, user2); 
+                vector<string> callHistory = db.getPrivateCallHistory(user1, user2); 
+
+                cout << "[DB] Loaded: " << chatHistory.size() << " chats, "
+                    << fileHistory.size() << " files, " 
+                    << callHistory.size() << " calls" << endl;
+
+                auto escape = [](string s) {
+                    string r = "";
+                    for (char c : s) {
+                        if (c == '\"') r += "\\\"";
+                        else if (c == '\\') r += "\\\\";
+                        else if (c == '\n') r += "\\n";
+                        else if (c == '\r') r += "\\r";
+                        else if (c == '\t') r += "\\t";
+                        else r += c;
+                    }
+                    return r;
+                };
+
+                string json = "{ \"action\": \"history_response\", \"user1\": \"" + user1 + 
+                            "\", \"user2\": \"" + user2 + "\", \"chatHistory\": [";
+
+                for (size_t i = 0; i < chatHistory.size(); i++) {
+                    json += "\"" + escape(chatHistory[i]) + "\"";
+                    if (i < chatHistory.size()-1) json += ",";
+                }
+
+                json += "], \"fileHistory\": [";
+                for (size_t i = 0; i < fileHistory.size(); i++) {
+                    json += "\"" + escape(fileHistory[i]) + "\"";
+                    if (i < fileHistory.size()-1) json += ",";
+                }
+
+                json += "], \"callHistory\": [";
+                for (size_t i = 0; i < callHistory.size(); i++) {
+                    json += "\"" + escape(callHistory[i]) + "\"";
+                    if (i < callHistory.size()-1) json += ",";
+                }
+                json += "] }\n";
+                
+                cout << "[DEBUG] JSON Response (first 500 chars):\n" << json.substr(0, 500) << endl;
+                
+                cout << "[INFO] Sending response (" << json.length() << " bytes)" << endl;
+                int sent = send(client, json.c_str(), (int)json.size(), 0);
+                if (sent == SOCKET_ERROR) {
+                    cout << "[ERROR] Send failed: " << WSAGetLastError() << endl;
+                } else {
+                    cout << "[INFO] ✅ Sent " << sent << " bytes successfully" << endl;
+                }
+                
+                continue;
+            }
+
+            else if (action == "save_private_message") {
+                string from = parseField(msg, "from");
+                string to = parseField(msg, "to");
+                string message = parseField(msg, "message");
+                if (!from.empty() && !to.empty() && !message.empty()) {
+                    db.saveMessage(from, to, message);
+                    cout << "[DB] Saved private message via Gateway: " << from << " -> " << to << endl;
+                }
+                continue;
+            }
+
+            else if (action == "save_file") {
+                string from = parseField(msg, "from");
+                string to = parseField(msg, "to");
+                string filename = parseField(msg, "filename");
+                
+                if (!from.empty() && !to.empty() && !filename.empty()) {
+                    db.saveFileHistory(from, to, filename);
+                    cout << "[DB] ✅ Saved file history: " << from << " -> " << to << ": " << filename << endl;
+                    
+                    string ack = R"({ "action": "file_saved", "status": "success" })" "\n";
+                    send(client, ack.c_str(), (int)ack.size(), 0);
+                } else {
+                    cout << "[WARN] save_file: Missing from/to/filename" << endl;
+                }
+                continue;
+            }
+
+            else if (action == "list") {
+                string list = "{ \"action\": \"online_list\", \"users\": [";
+                {
+                    lock_guard<mutex> lock(mtx);
+                    bool first = true;
+                    for (const auto& pair : userMap) {
+                        if (!first) list += ",";
+                        list += "\"" + pair.first + "\"";
+                        first = false;
+                    }
+                }
+                list += "] }\n";
+                send(client, list.c_str(), (int)list.size(), 0);
+                continue;
+            }
+            
+            else if (action == "private") {
+                string from = parseField(msg, "from");
+                string to = parseField(msg, "to");
+                string message = parseField(msg, "message");
+                if (!from.empty() && !to.empty() && !message.empty()) {
+                    string chatMsg = "{ \"action\": \"private\", \"from\": \"" + from +
+                                    "\", \"to\": \"" + to +
+                                    "\", \"message\": \"" + message + "\" }\n";
+                    sendToUser(to, chatMsg);
+                    sendToUser(from, chatMsg);
+                    db.saveMessage(from, to, message); 
+                }
+                continue;
+            }
+            
+            else if (action == "sendfile") {
+                string from = parseField(msg, "from");
+                string to = parseField(msg, "to");
+                string filename = parseField(msg, "filename");
+                string sizeStr = parseField(msg, "size");
+
+                cout << "[INFO] " << from << " muon gui file " << filename << " (" << sizeStr << " bytes) -> " << to << endl;
+                
+                string notify = "{ \"action\": \"file_ready\", \"port\": 9999, \"message\": \"Hay gui file qua cong 9999\" }\n";
+                send(client, notify.c_str(), notify.size(), 0);
+                db.saveFileHistory(from, to, filename);
+                continue;
+            }
+            
+            else if (action == "voice_register") {
+                string username = parseField(msg, "username");
+                string ip = parseField(msg, "ip");
+                string portStr = parseField(msg, "port");
+
+                if (username.empty() || ip.empty() || portStr.empty()) {
+                    string err = R"({ "action": "error", "message": "Thong tin voice_register khong hop le" })";
+                    send(client, err.c_str(), (int)err.size(), 0);
+                    continue;
+                }
+
+                sockaddr_in addr;
+                addr.sin_family = AF_INET;
+                inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);
+                addr.sin_port = htons(stoi(portStr));
+
+                voiceServer.registerClient(username, addr);
+                string ok = R"({ "action": "voice_register_ok", "message": "Da dang ky voice thanh cong" })" "\n";
+                send(client, ok.c_str(), (int)ok.size(), 0);
+
+                cout << "[VOICE] " << username << " đăng ký địa chỉ UDP " << ip << ":" << portStr << endl;
+                continue;
+            }
+
+            else if (action == "voice_call") {
+                string from = parseField(msg, "from");
+                string to = parseField(msg, "to");
+
+                if (from.empty() || to.empty()) {
+                    string err = R"({ "action": "error", "message": "Thông tin cuộc gọi không hợp lệ" })";
+                    send(client, err.c_str(), (int)err.size(), 0);
+                    continue;
+                }
+                
+                string callMsg = "{ \"action\": \"incoming_call\", \"from\": \"" + from + "\" }\n";
+                sendToUser(to, callMsg);
+                cout << "[VOICE] Cuộc gọi voice từ " << from << " đến " << to << endl;
+                db.saveCallHistory(from, to, "started");
                 continue;
             }
             
