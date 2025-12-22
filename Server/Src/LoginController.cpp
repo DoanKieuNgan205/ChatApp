@@ -4,14 +4,6 @@
 extern string parseField(const string& json, const string& field);
 using namespace std;
 
-/*string LoginController::handleLogin(const string& request) {
-    if (Auth::checkCredentials(request)) {
-        return R"({ "action": "login_response", "status": "success", "message": "LOGIN_SUCCESS" })";
-    } else {
-        return R"({ "action": "login_response", "status": "fail", "message": "LOGIN_FAIL" })";
-    }
-}*/
-
 string LoginController::handleLogin(const string& request) {
     string username = parseField(request, "username"); 
 

@@ -3,9 +3,16 @@
 #include <thread>
 #include <cstring>
 
+std::function<void(const std::string&, const std::string&)> notifyCallEventCallback = nullptr;
+
+
 VoiceServer::VoiceServer() {
     running = false;
     udpSocket = INVALID_SOCKET;
+}
+
+void VoiceServer::setNotifyCallback(std::function<void(const std::string&, const std::string&)> callback) {
+    notifyCallEventCallback = callback;
 }
 
 bool VoiceServer::start(int port) {
@@ -85,6 +92,11 @@ void VoiceServer::run() {
             continue;
         }
 
+        if (msg.rfind("END_CALL:", 0) == 0) {
+            handleEndCall(msg);
+            continue;
+        }
+
         const std::string dataMarker = "|DATA|";
 
         std::string msgStr(buffer.data(), bytesReceived);
@@ -114,6 +126,7 @@ void VoiceServer::run() {
 
 void VoiceServer::registerClient(const std::string& username, const sockaddr_in& addr) {
     std::lock_guard<std::mutex> lock(mtx);
+    
     clients[username] = addr;
 }
 
@@ -154,6 +167,12 @@ void VoiceServer::handleCallRequest(const std::string& msg) {
 
 
     std::cout << "📞 " << caller << " đang gọi " << callee << "\n";
+
+    // THÊM: Thông báo cho ChatServer
+    if (notifyCallEventCallback) {
+        std::string jsonMsg = "{\"action\":\"INCOMING_CALL\",\"from\":\"" + caller + "\",\"to\":\"" + callee + "\"}";
+        notifyCallEventCallback(callee, jsonMsg);
+    }
 }
 
 void VoiceServer::handleAcceptCall(const std::string& msg) {
@@ -178,6 +197,14 @@ void VoiceServer::handleAcceptCall(const std::string& msg) {
     }
 
     std::cout << "✅ Cuộc gọi giữa " << caller << " và " << callee << " bắt đầu.\n";
+
+    if (notifyCallEventCallback) {
+        std::string jsonMsg1 = "{\"action\":\"CALL_ACCEPTED\",\"from\":\"" + callee + "\",\"to\":\"" + caller + "\"}";
+        notifyCallEventCallback(caller, jsonMsg1);
+        
+        std::string jsonMsg2 = "{\"action\":\"CALL_ACCEPTED\",\"from\":\"" + callee + "\",\"to\":\"" + caller + "\"}";
+        notifyCallEventCallback(callee, jsonMsg2);
+    }
 }
 
 void VoiceServer::handleRejectCall(const std::string& msg) {
@@ -197,6 +224,27 @@ void VoiceServer::handleRejectCall(const std::string& msg) {
     }
 
     std::cout << "❌ " << callee << " từ chối cuộc gọi từ " << caller << "\n";
+
+    if (notifyCallEventCallback) {
+        std::string jsonMsg = "{\"action\":\"CALL_REJECTED\",\"from\":\"" + callee + "\",\"to\":\"" + caller + "\"}";
+        notifyCallEventCallback(caller, jsonMsg);
+    }
+}
+
+void VoiceServer::handleEndCall(const std::string& msg) {
+    size_t p1 = msg.find(":");
+    size_t p2 = msg.find("|TO:");
+    if (p1 == std::string::npos || p2 == std::string::npos) return;
+
+    std::string caller = msg.substr(p1 + 1, p2 - (p1 + 1));
+    std::string callee = msg.substr(p2 + 4);
+
+    std::lock_guard<std::mutex> lock(mtx);
+    
+    callPairs.erase(caller);
+    callPairs.erase(callee);
+    
+    std::cout << "📴 Cuộc gọi kết thúc: " << caller << " <-> " << callee << "\n";
 }
 
 void VoiceServer::forwardVoice(const std::string& from, const std::string& to, const char* data, int len) {

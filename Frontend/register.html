@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!--<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
@@ -28,7 +28,7 @@
 <script>
 (() => {
   const statusEl = document.getElementById('status');
-  const ws = new WebSocket('wss://10.10.49.115:3000'); 
+  const ws = new WebSocket('wss://10.10.58.199:3000'); 
 
   ws.addEventListener('open', () => {
     console.log('[Frontend] Connected to gateway');
@@ -58,7 +58,7 @@
 
   ws.addEventListener('error', () => {
     statusEl.style.color = 'red';
-    statusEl.textContent = 'Không kết nối được gateway (wss://10.10.49.115:3000)';
+    statusEl.textContent = 'Không kết nối được gateway (wss://10.10.58.199:3000)';
   });
 
   document.getElementById('registerForm').addEventListener('submit', (evt) => {
@@ -90,6 +90,137 @@
     }
   });
 })();
+</script>
+</body>
+</html>-->
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Đăng ký ChatApp</title>
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&family=Open+Sans:wght@300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="register.css" />
+</head>
+<body>
+   <div class="register-container">
+    <h2>Đăng ký ChatApp</h2>
+    <form id="registerForm">
+      <input type="text" id="username" placeholder="Tên đăng nhập" required />
+      <input type="email" id="email" placeholder="Email" required />
+      <input type="password" id="password" placeholder="Mật khẩu" required />
+      <input type="password" id="confirm" placeholder="Nhập lại mật khẩu" required />
+      <button type="submit">Đăng ký</button>
+    </form>
+
+    <p id="status"></p>
+    <p style="text-align:center;margin-top:10px;">
+      Đã có tài khoản? <a href="login.html" style="color:#6f5ce8;text-decoration:none;">Đăng nhập ngay</a>
+    </p>
+  </div>
+
+<script>
+(() => {
+  const statusEl = document.getElementById('status');
+  const ws = new WebSocket('wss://192.168.1.4:3000'); 
+  
+  ws.addEventListener('open', () => {
+    console.log('[Frontend] Connected to gateway');
+  });
+
+  ws.addEventListener('message', (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      console.log('[Frontend] Received', data);
+
+      if (data.action === 'register_response' || data.status) {
+        if (data.status === 'success') {
+          statusEl.style.color = 'green';
+          statusEl.textContent = 'Đăng ký thành công! Chuyển sang đăng nhập...';
+          setTimeout(() => {
+            window.location.href = 'login.html';
+          }, 1000);
+        } else {
+          // Xử lý các message lỗi cụ thể
+          let errorMsg = 'Đăng ký thất bại';
+          
+          switch(data.message) {
+            case 'USERNAME_EXISTS':
+              errorMsg = 'Tên đăng nhập đã tồn tại';
+              break;
+            case 'INVALID_EMAIL_FORMAT':
+              errorMsg = 'Email không đúng định dạng';
+              break;
+            case 'INVALID_INPUT':
+              errorMsg = 'Vui lòng nhập đầy đủ thông tin';
+              break;
+            case 'DB_NOT_CONNECTED':
+              errorMsg = 'Lỗi kết nối cơ sở dữ liệu';
+              break;
+            default:
+              errorMsg = data.message || 'Đăng ký thất bại';
+        }
+        statusEl.style.color = 'red';
+        statusEl.textContent = errorMsg;
+        }
+      }
+    } catch (e) {
+      console.warn('[Frontend] Non-JSON message', ev.data);
+    }
+  });
+
+  ws.addEventListener('error', () => {
+    statusEl.style.color = 'red';
+    statusEl.textContent = 'Không kết nối được gateway (wss://192.168.1.4:3000)';
+  });
+
+  document.getElementById('registerForm').addEventListener('submit', (evt) => {
+    evt.preventDefault();
+    const u = document.getElementById('username').value.trim();
+    const e = document.getElementById('email').value.trim();
+    const p = document.getElementById('password').value.trim();
+    const c = document.getElementById('confirm').value.trim();
+
+    if (!u || !e || !p || !c) {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Vui lòng nhập đầy đủ thông tin';
+      return;
+    }
+    if (p !== c) {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Mật khẩu không khớp';
+      return;
+    }
+    if (!validateEmail(e)) {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Email không đúng định dạng';
+      return;
+    }
+    const payload = { 
+      action: 'register', 
+      username: u, 
+      password: p,
+      email: e
+    };
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload));
+      statusEl.style.color = 'black';
+      statusEl.textContent = 'Đang xử lý đăng ký...';
+      console.log('[Frontend] Sent register', payload);
+    } else {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Chưa kết nối tới gateway, thử lại sau';
+    }
+  });
+  function validateEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  }
+})();
+
 </script>
 </body>
 </html>

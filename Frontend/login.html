@@ -1,3 +1,133 @@
+<!--<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChatApp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&family=Open+Sans:wght@300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+</head>
+<body>
+  <div class="split-container">
+    <div class="left-section">
+      <div class="login-content">
+        <h2>Đăng nhập</h2>
+        <form id="loginForm">
+          <input type="text" id="username" placeholder="Tên đăng nhập" required />
+          <input type="password" id="password" placeholder="Mật khẩu" required />
+          <button type="submit">Đăng nhập</button>
+        </form>
+        <div class="register-link">
+          Chưa có tài khoản? <a href="register.html" id="registerLink">Tạo tài khoản ngay</a>
+        </div>
+        <p id="status"></p>
+      </div>
+    </div>
+    <div class="right-section">
+      <div class="logo-content">
+        <lottie-player 
+          src="logos/logo.json"  
+          background="transparent"
+          speed="1"
+          loop
+          autoplay>
+        </lottie-player>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const statusEl = document.getElementById('status');
+  const formEl = document.getElementById('loginForm');
+
+  let ws = null;
+
+  function connectWS(callback) {
+    ws = new WebSocket('wss://10.10.58.199:3000');
+
+    ws.addEventListener('open', () => {
+      console.log('[Frontend] ✅ WS connected to gateway');
+      if (callback) callback(); 
+    });
+
+    ws.addEventListener('message', (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        console.log('[Frontend] 📩 Received', data);
+
+        if (data.action === 'login_response' || (data.status && data.message)) {
+          if (data.status === 'success' && data.message === 'LOGIN_SUCCESS') {
+            statusEl.style.color = 'green';
+            statusEl.textContent = 'Đăng nhập thành công. Chuyển tới chat...';
+            setTimeout(() => (window.location.href = 'chat.html'), 400);
+          } else {
+            statusEl.style.color = 'red';
+            statusEl.textContent = 'Sai tài khoản hoặc mật khẩu.';
+          }
+        }
+      } catch (e) {
+        console.warn('[Frontend] Non-JSON message:', ev.data);
+      }
+    });
+
+    ws.addEventListener('close', () => {
+      console.warn('[Frontend] ⚠️ WSS connection closed');
+    });
+
+    ws.addEventListener('error', (e) => {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Không kết nối được gateway (wss://10.10.58.199:3000)';
+      console.error(e);
+    });
+  }
+
+  connectWS();
+
+  formEl.addEventListener('submit', (evt) => {
+    evt.preventDefault();
+
+    const u = document.getElementById('username').value.trim();
+    const p = document.getElementById('password').value.trim();
+
+    if (!u || !p) {
+      statusEl.style.color = 'red';
+      statusEl.textContent = 'Vui lòng nhập đầy đủ thông tin';
+      return;
+    }
+
+    sessionStorage.setItem('chat_username', u);
+
+    const payload = { action: 'login', username: u, password: p };
+
+    if (ws.readyState !== WebSocket.OPEN) {
+      console.log('[Frontend] ⚡ WS not open, reconnecting...');
+      statusEl.style.color = 'gray';
+      statusEl.textContent = 'Đang kết nối lại...';
+
+      connectWS(() => {
+        console.log('[Frontend] 🔁 Reconnected, sending login');
+        ws.send(JSON.stringify(payload));
+        statusEl.style.color = 'black';
+        statusEl.textContent = 'Đang xác thực...';
+      });
+      return;
+    }
+
+    ws.send(JSON.stringify(payload));
+    statusEl.style.color = 'black';
+    statusEl.textContent = 'Đang xác thực...';
+    console.log('[Frontend] Sent login', payload);
+  });
+})();
+</script>
+</body>
+</html>-->
+
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -48,7 +178,8 @@
   let ws = null;
 
   function connectWS(callback) {
-    ws = new WebSocket('wss://10.10.49.115:3000');
+    
+    ws = new WebSocket('wss://10.246.147.186:3000');
 
     ws.addEventListener('open', () => {
       console.log('[Frontend] ✅ WS connected to gateway');
@@ -81,7 +212,7 @@
 
     ws.addEventListener('error', (e) => {
       statusEl.style.color = 'red';
-      statusEl.textContent = 'Không kết nối được gateway (wss://10.10.49.115:3000)';
+      statusEl.textContent = 'Không kết nối được gateway (wss://10.246.147.186:3000)';
       console.error(e);
     });
   }

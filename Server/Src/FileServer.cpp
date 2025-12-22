@@ -17,7 +17,6 @@ bool FileServer::handleIncomingFile(
               << " | File: " << filename
               << " | Size: " << fileSize << " bytes\n";
 
-    // Kiểm tra người nhận có online không
     auto it = clientMap.find(toUser);
     if (it == clientMap.end()) {
         std::cerr << "[WARN] '" << toUser << "' không online.\n";
@@ -26,13 +25,11 @@ bool FileServer::handleIncomingFile(
 
     SOCKET receiverSock = it->second;
 
-    // Gửi metadata sang người nhận
     std::string notify = "{ \"action\": \"sendfile\", \"from\": \"" + fromUser +
                          "\", \"filename\": \"" + filename +
                          "\", \"size\": \"" + std::to_string(fileSize) + "\" }";
     send(receiverSock, notify.c_str(), notify.size(), 0);
 
-    // Ghi ra file tạm để test (optional)
     std::ofstream out("received_" + filename, std::ios::binary);
     if (!out.is_open()) {
         std::cerr << "[ERROR] Không thể tạo file tạm.\n";
@@ -50,7 +47,7 @@ bool FileServer::handleIncomingFile(
             out.close();
             return false;
         }
-        out.write(buffer.data(), r);              // Lưu file tạm (test)
+        out.write(buffer.data(), r);              
         send(receiverSock, buffer.data(), r, 0);
         received += r;
         
@@ -85,7 +82,7 @@ void FileServer::startFileServer(std::map<std::string, SOCKET>& clientMap) {
 
             std::string header;
             char ch;
-            // Đọc từng ký tự cho tới khi gặp '\n' => header kết thúc
+
             while (true) {
                 int r = recv(clientSock, &ch, 1, 0);
                 if (r <= 0) {
@@ -96,8 +93,6 @@ void FileServer::startFileServer(std::map<std::string, SOCKET>& clientMap) {
                 header += ch;
             }
 
-
-            // Tách thông tin JSON
             auto getField = [&](const std::string& field) {
                 size_t pos = header.find("\"" + field + "\"");
                 if (pos == std::string::npos) return std::string();

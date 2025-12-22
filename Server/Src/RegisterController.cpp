@@ -19,16 +19,21 @@ std::string RegisterController::handleRegister(const std::string& request) {
 
     std::string username = extractValue("\"username\"");
     std::string password = extractValue("\"password\"");
+    std::string email = extractValue("\"email\""); 
 
     if (username.empty() || password.empty()) {
         return R"({ "action": "register_response", "status": "fail", "message": "INVALID_INPUT" })";
     }
-
+    if (!email.empty()) {
+        if (email.find('@') == std::string::npos || email.find('.') == std::string::npos) {
+            return R"({ "action": "register_response", "status": "fail", "message": "INVALID_EMAIL_FORMAT" })";
+        }
+    }
     if (!db.isConnected()) {
         return R"({ "action": "register_response", "status": "fail", "message": "DB_NOT_CONNECTED" })";
     }
 
-    if (db.registerUser(username, password)) {
+    if (db.registerUser(username, password,email)) {
         return R"({ "action": "register_response", "status": "success", "message": "REGISTER_SUCCESS" })";
     } else {
         return R"({ "action": "register_response", "status": "fail", "message": "USERNAME_EXISTS" })";

@@ -24,6 +24,7 @@
     document.getElementById('targetUser').innerText = target;
 
     document.getElementById('cancelBtn').onclick = () => {
+      saveCallHistory("cancelled");   
       stopCallTimer();
       window.close(); 
     };

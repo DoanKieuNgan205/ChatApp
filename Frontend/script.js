@@ -8,7 +8,7 @@ document.getElementById("loginForm").addEventListener("submit", (e) => {
   const status = document.getElementById("status");
 
   if (!socket || socket.readyState !== WebSocket.OPEN) {
-    socket = new WebSocket("wss://10.10.49.115:3000"); 
+    socket = new WebSocket("wss://10.246.147.186:3000"); 
 
     socket.onopen = () => {
       console.log("Đã kết nối tới Gateway");

@@ -275,3 +275,143 @@ body {
     font-weight: bold;
     border-top: 1px solid #eee;
 }
+
+/* Style cho call bubble */
+.call-bubble {
+  background: #f0f2f5 !important;
+  padding: 8px 12px !important;
+  min-width: 200px;
+  max-width: 280px;
+}
+
+.call-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.call-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: white;
+  flex-shrink: 0;
+}
+
+.call-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.call-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #050505;
+  margin-bottom: 2px;
+}
+
+.call-time {
+  font-size: 12px;
+  color: #65676b;
+}
+
+/* Call status colors */
+.call-started .call-icon {
+  background: #e3f2fd;
+}
+
+.call-accepted .call-icon {
+  background: #e8f5e9;
+}
+
+.call-rejected .call-icon,
+.call-missed .call-icon {
+  background: #ffebee;
+}
+
+.call-ended .call-icon {
+  background: #f5f5f5;
+}
+
+.call-incoming .call-icon {
+  background: #fff3e0;
+}
+
+/* Thêm nút "Gọi lại" cho cuộc gọi nhỡ */
+.call-action {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e4e6eb;
+}
+
+.call-action-btn {
+  background: #0084ff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.call-action-btn:hover {
+  background: #0073e6;
+  transform: scale(1.02);
+}
+
+/* Animation cho call bubble */
+.call-bubble {
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Call status colors - Phân biệt đi/đến */
+.call-outgoing .call-icon,
+.call-outgoing-accepted .call-icon {
+  background: #e3f2fd; /* Xanh dương nhạt - cuộc gọi đi */
+}
+
+.call-incoming .call-icon,
+.call-incoming-accepted .call-icon {
+  background: #e8f5e9; /* Xanh lá nhạt - cuộc gọi đến */
+}
+
+.call-rejected-outgoing .call-icon {
+  background: #ffebee; /* Đỏ nhạt - bị từ chối */
+}
+
+.call-missed .call-icon {
+  background: #fff3e0; /* Cam nhạt - cuộc gọi nhỡ */
+}
+
+.call-ended-outgoing .call-icon,
+.call-ended-incoming .call-icon {
+  background: #f5f5f5; /* Xám - đã kết thúc */
+}
+
+/* Màu cho mũi tên */
+.call-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #050505;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
